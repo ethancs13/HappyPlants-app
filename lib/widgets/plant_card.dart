@@ -49,7 +49,11 @@ class PlantCard extends StatelessWidget {
               height: double.infinity,
               color: AppColors.potRim,
               child: Center(
-                child: PlantWidget(isHappy: !overdue, size: 56),
+                child: PlantWidget(
+                  isHappy: !overdue,
+                  size: 56,
+                  plantKey: plant.plantKey,
+                ),
               ),
             ),
             // Info section

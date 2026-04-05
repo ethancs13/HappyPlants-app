@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:happy_plants/models/plant.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:happy_plants/widgets/plant_picker.dart';
 
 class AddPlantScreen extends StatefulWidget {
   const AddPlantScreen({super.key});
@@ -17,6 +18,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   final _speciesController = TextEditingController();
   final _intervalController = TextEditingController();
   final _notesController = TextEditingController();
+  String? _selectedPlantKey;
   bool _saving = false;
 
   @override
@@ -40,6 +42,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        plantKey: _selectedPlantKey,
       ));
       if (mounted) Navigator.pop(context, true);
     } finally {
@@ -99,6 +102,18 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                       hint: 'Care tips, location, etc.',
                       maxLines: 3,
                     ),
+                    const SizedBox(height: 24),
+                    // ── Plant illustration picker ──────────────────
+                    _sectionLabel('Choose an illustration (optional)'),
+                    const SizedBox(height: 10),
+                    PlantPicker(
+                      selectedKey: _selectedPlantKey,
+                      onSelected: (key) => setState(() {
+                        // Tap the same tile again to deselect
+                        _selectedPlantKey =
+                            _selectedPlantKey == key ? null : key;
+                      }),
+                    ),
                     const SizedBox(height: 28),
                     SizedBox(
                       height: 52,
@@ -116,6 +131,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                             : const Text('Add Plant'),
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -151,6 +167,15 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     );
   }
 
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
   Widget _field({
     required TextEditingController controller,
     required String label,
@@ -163,14 +188,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        _sectionLabel(label),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,

@@ -1,14 +1,27 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 
 class PlantWidget extends StatefulWidget {
   final bool isHappy;
 
-  /// Width of the bounding box. Height is 1.6× width.
+  /// Width of the bounding box. Height = width × 1.6 for drawn widget,
+  /// or width × 1.0 (square) when using SVG assets (Figma frames are 500×500).
   final double size;
 
-  const PlantWidget({super.key, required this.isHappy, this.size = 120});
+  /// If set (e.g. 'plant_01'), loads SVG assets from
+  ///   assets/images/plants/PLANT_KEY_foliage.svg  (animated)
+  ///   assets/images/plants/PLANT_KEY_pot.svg       (static)
+  /// Otherwise falls back to the drawn widget.
+  final String? plantKey;
+
+  const PlantWidget({
+    super.key,
+    required this.isHappy,
+    this.size = 120,
+    this.plantKey,
+  });
 
   @override
   State<PlantWidget> createState() => _PlantWidgetState();
@@ -29,7 +42,6 @@ class _PlantWidgetState extends State<PlantWidget>
           : const Duration(milliseconds: 5000),
     )..repeat(reverse: true);
 
-    // Happy: lively ±14°, Sad: barely-moving ±4°
     final maxAngle = widget.isHappy ? 0.24 : 0.07;
     _sway = Tween<double>(begin: -maxAngle, end: maxAngle).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
@@ -44,6 +56,16 @@ class _PlantWidgetState extends State<PlantWidget>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.plantKey != null) {
+      return _SvgPlant(
+        plantKey: widget.plantKey!,
+        isHappy: widget.isHappy,
+        size: widget.size,
+        sway: _sway,
+      );
+    }
+
+    // Fallback: drawn widget (100×160 native, scaled to fit)
     final scale = widget.size / 100.0;
     return SizedBox(
       width: widget.size,
@@ -53,7 +75,7 @@ class _PlantWidgetState extends State<PlantWidget>
         builder: (_, child) => Transform.scale(
           scale: scale,
           alignment: Alignment.bottomCenter,
-          child: _PlantBody(
+          child: _DrawnPlantBody(
             isHappy: widget.isHappy,
             swayAngle: _sway.value,
           ),
@@ -63,13 +85,69 @@ class _PlantWidgetState extends State<PlantWidget>
   }
 }
 
-/// Static plant body drawn at native 100×160.
-/// Stem + leaves pivot around the base of the stem (bottom-center).
-class _PlantBody extends StatelessWidget {
+// ── SVG-based plant ─────────────────────────────────────────────────────────
+
+/// Stacks the pot SVG (static) under the foliage SVG (animated sway).
+/// Both assets are 500×500 with transparent backgrounds so they align
+/// automatically when placed at the same size.
+class _SvgPlant extends StatelessWidget {
+  final String plantKey;
+  final bool isHappy;
+  final double size;
+  final Animation<double> sway;
+
+  const _SvgPlant({
+    required this.plantKey,
+    required this.isHappy,
+    required this.size,
+    required this.sway,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foliagePath = 'assets/images/plants/${plantKey}_foliage.svg';
+    final potPath = 'assets/images/plants/${plantKey}_pot.svg';
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: [
+          // Foliage — behind the pot, sways around the bottom-center pivot
+          AnimatedBuilder(
+            animation: sway,
+            builder: (_, child) => Transform(
+              alignment: Alignment.bottomCenter,
+              transform: Matrix4.rotationZ(sway.value),
+              child: child,
+            ),
+            child: SvgPicture.asset(
+              foliagePath,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+            ),
+          ),
+          // Pot — static, rendered on top so foliage appears to grow from it
+          SvgPicture.asset(
+            potPath,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Drawn fallback plant ─────────────────────────────────────────────────────
+
+class _DrawnPlantBody extends StatelessWidget {
   final bool isHappy;
   final double swayAngle;
 
-  const _PlantBody({required this.isHappy, required this.swayAngle});
+  const _DrawnPlantBody({required this.isHappy, required this.swayAngle});
 
   @override
   Widget build(BuildContext context) {
@@ -79,13 +157,11 @@ class _PlantBody extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ── Pot body ────────────────────────────────────────────
           Positioned(
             left: 18,
             top: 112,
             child: _trapezoidPot(),
           ),
-          // Pot rim
           Positioned(
             left: 14,
             top: 106,
@@ -98,21 +174,17 @@ class _PlantBody extends StatelessWidget {
               ),
             ),
           ),
-
-          // ── Animated stem + leaves ───────────────────────────────
-          // Pivot = base of stem, which sits at (50, 106) in the 100×160 space.
           Positioned(
             left: 0,
             right: 0,
             top: 0,
-            bottom: 54, // 160 - 106 = 54 px from bottom
+            bottom: 54,
             child: Transform(
               alignment: Alignment.bottomCenter,
               transform: Matrix4.rotationZ(swayAngle),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // Stem
                   Positioned(
                     left: 46,
                     bottom: 0,
@@ -127,7 +199,6 @@ class _PlantBody extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   if (isHappy) ..._happyLeaves(swayAngle)
                   else ..._sadLeaves(swayAngle),
                 ],
@@ -139,9 +210,7 @@ class _PlantBody extends StatelessWidget {
     );
   }
 
-  // ── Happy: two big oval leaves like the Figma design ────────────
   List<Widget> _happyLeaves(double sway) => [
-        // Left leaf — dark forest green, angled up-left
         Positioned(
           left: 6,
           bottom: 30,
@@ -151,7 +220,6 @@ class _PlantBody extends StatelessWidget {
             child: _oval(40, 26, AppColors.forest),
           ),
         ),
-        // Right leaf — olive, angled up-right, slightly higher
         Positioned(
           left: 54,
           bottom: 38,
@@ -161,7 +229,6 @@ class _PlantBody extends StatelessWidget {
             child: _oval(36, 23, AppColors.olive),
           ),
         ),
-        // Small top bud
         Positioned(
           left: 38,
           bottom: 54,
@@ -172,9 +239,7 @@ class _PlantBody extends StatelessWidget {
         ),
       ];
 
-  // ── Sad: drooping leaves ─────────────────────────────────────────
   List<Widget> _sadLeaves(double sway) => [
-        // Left — muted, drooping outward-down
         Positioned(
           left: 8,
           bottom: 18,
@@ -184,7 +249,6 @@ class _PlantBody extends StatelessWidget {
             child: _oval(36, 22, AppColors.plantLeafMuted),
           ),
         ),
-        // Right — muted, drooping outward-down
         Positioned(
           left: 56,
           bottom: 18,
@@ -194,7 +258,6 @@ class _PlantBody extends StatelessWidget {
             child: _oval(36, 22, AppColors.plantLeafMuted),
           ),
         ),
-        // Top — slightly wilted, leaning
         Positioned(
           left: 34,
           bottom: 38,
@@ -214,7 +277,6 @@ class _PlantBody extends StatelessWidget {
         ),
       );
 
-  /// Simple trapezoid pot shape via CustomPaint.
   Widget _trapezoidPot() => CustomPaint(
         size: const Size(64, 44),
         painter: _TrapezoidPainter(AppColors.potBody),
@@ -228,14 +290,6 @@ class _TrapezoidPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
-    final path = Path()
-      ..moveTo(4, 0) // top-left (inset slightly for rim overlap)
-      ..lineTo(size.width - 4, 0) // top-right
-      ..lineTo(size.width - 2, size.height) // bottom-right (slightly wider)
-      ..lineTo(2, size.height) // bottom-left
-      ..close();
-    canvas.drawPath(path, paint);
-    // Rounded corners
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.width, size.height),
       const Radius.circular(4),

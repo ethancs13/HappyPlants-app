@@ -7,6 +7,9 @@ class Plant {
   final DateTime? lastFertilizedDate;
   final String? notes;
 
+  /// e.g. 'plant_01' … 'plant_15'. Null = use the default drawn widget.
+  final String? plantKey;
+
   const Plant({
     this.id,
     required this.name,
@@ -15,6 +18,7 @@ class Plant {
     this.lastWateredDate,
     this.lastFertilizedDate,
     this.notes,
+    this.plantKey,
   });
 
   DateTime? get nextWateringDate {
@@ -36,6 +40,7 @@ class Plant {
     DateTime? lastWateredDate,
     DateTime? lastFertilizedDate,
     String? notes,
+    String? plantKey,
   }) {
     return Plant(
       id: id ?? this.id,
@@ -45,6 +50,7 @@ class Plant {
       lastWateredDate: lastWateredDate ?? this.lastWateredDate,
       lastFertilizedDate: lastFertilizedDate ?? this.lastFertilizedDate,
       notes: notes ?? this.notes,
+      plantKey: plantKey ?? this.plantKey,
     );
   }
 
@@ -57,6 +63,7 @@ class Plant {
       'last_watered_date': lastWateredDate?.toIso8601String(),
       'last_fertilized_date': lastFertilizedDate?.toIso8601String(),
       'notes': notes,
+      'plant_key': plantKey,
     };
   }
 
@@ -73,6 +80,7 @@ class Plant {
           ? DateTime.parse(map['last_fertilized_date'] as String)
           : null,
       notes: map['notes'] as String?,
+      plantKey: map['plant_key'] as String?,
     );
   }
 }
