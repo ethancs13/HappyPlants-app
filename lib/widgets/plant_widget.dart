@@ -5,8 +5,7 @@ import 'package:happy_plants/theme/app_theme.dart';
 class PlantWidget extends StatefulWidget {
   final bool isHappy;
 
-  /// Width/height of the bounding box. The plant is drawn at 100×160
-  /// native size and scaled to fit.
+  /// Width of the bounding box. Height is 1.6× width.
   final double size;
 
   const PlantWidget({super.key, required this.isHappy, this.size = 120});
@@ -27,10 +26,11 @@ class _PlantWidgetState extends State<PlantWidget>
       vsync: this,
       duration: widget.isHappy
           ? const Duration(milliseconds: 2000)
-          : const Duration(milliseconds: 6000),
+          : const Duration(milliseconds: 5000),
     )..repeat(reverse: true);
 
-    final maxAngle = widget.isHappy ? 0.18 : 0.05; // radians
+    // Happy: lively ±14°, Sad: barely-moving ±4°
+    final maxAngle = widget.isHappy ? 0.24 : 0.07;
     _sway = Tween<double>(begin: -maxAngle, end: maxAngle).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -63,8 +63,8 @@ class _PlantWidgetState extends State<PlantWidget>
   }
 }
 
-/// Static plant body at native 100×160 size.
-/// The stem and leaves rotate around the base of the stem.
+/// Static plant body drawn at native 100×160.
+/// Stem + leaves pivot around the base of the stem (bottom-center).
 class _PlantBody extends StatelessWidget {
   final bool isHappy;
   final double swayAngle;
@@ -73,55 +73,39 @@ class _PlantBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final leafColor = isHappy ? AppColors.forest : AppColors.plantLeafMuted;
-    final leafColorAlt = isHappy ? AppColors.olive : AppColors.plantLeafMuted;
-    final stemColor = isHappy ? AppColors.plantStem : const Color(0xFF6B7A50);
-
     return SizedBox(
       width: 100,
       height: 160,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ── Pot base (static) ────────────────────────────────
+          // ── Pot body ────────────────────────────────────────────
           Positioned(
-            left: 20,
-            top: 110,
-            child: Container(
-              width: 60,
-              height: 50,
-              decoration: ShapeDecoration(
-                color: AppColors.potBody,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
+            left: 18,
+            top: 112,
+            child: _trapezoidPot(),
           ),
-          // Pot rim (static)
+          // Pot rim
           Positioned(
-            left: 16,
-            top: 104,
+            left: 14,
+            top: 106,
             child: Container(
-              width: 68,
+              width: 72,
               height: 12,
-              decoration: ShapeDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.potRim,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(3),
-                ),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ),
 
-          // ── Animated stem + leaves ────────────────────────────
-          // Pivot point is the base of the stem (center-bottom of stem).
-          // We rotate everything above the pot around that point.
+          // ── Animated stem + leaves ───────────────────────────────
+          // Pivot = base of stem, which sits at (50, 106) in the 100×160 space.
           Positioned(
             left: 0,
-            top: 0,
             right: 0,
-            bottom: 56, // bottom of stem aligns with top of pot rim
+            top: 0,
+            bottom: 54, // 160 - 106 = 54 px from bottom
             child: Transform(
               alignment: Alignment.bottomCenter,
               transform: Matrix4.rotationZ(swayAngle),
@@ -133,73 +117,19 @@ class _PlantBody extends StatelessWidget {
                     left: 46,
                     bottom: 0,
                     child: Container(
-                      width: 7,
-                      height: isHappy ? 55 : 45,
-                      decoration: ShapeDecoration(
-                        color: stemColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                      width: 8,
+                      height: isHappy ? 58 : 44,
+                      decoration: BoxDecoration(
+                        color: isHappy
+                            ? AppColors.plantStem
+                            : const Color(0xFF5E6E42),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
 
-                  if (isHappy) ...[
-                    // Left leaf
-                    Positioned(
-                      left: 14,
-                      bottom: 42,
-                      child: Transform.rotate(
-                        angle: -pi / 6 + swayAngle * 0.5,
-                        child: _leaf(36, 22, leafColor),
-                      ),
-                    ),
-                    // Right leaf
-                    Positioned(
-                      left: 50,
-                      bottom: 46,
-                      child: Transform.rotate(
-                        angle: pi / 6 + swayAngle * 0.5,
-                        child: _leaf(36, 22, leafColorAlt),
-                      ),
-                    ),
-                    // Top leaf
-                    Positioned(
-                      left: 35,
-                      bottom: 60,
-                      child: Transform.rotate(
-                        angle: swayAngle * 0.3,
-                        child: _leaf(28, 34, leafColor),
-                      ),
-                    ),
-                  ] else ...[
-                    // Sad: drooping leaves
-                    Positioned(
-                      left: 16,
-                      bottom: 28,
-                      child: Transform.rotate(
-                        angle: -pi / 2.2 + swayAngle,
-                        child: _leaf(32, 18, leafColor),
-                      ),
-                    ),
-                    Positioned(
-                      left: 52,
-                      bottom: 28,
-                      child: Transform.rotate(
-                        angle: pi / 2.2 + swayAngle,
-                        child: _leaf(32, 18, leafColor),
-                      ),
-                    ),
-                    // Wilted top
-                    Positioned(
-                      left: 38,
-                      bottom: 48,
-                      child: Transform.rotate(
-                        angle: 0.25 + swayAngle * 0.3,
-                        child: _leaf(22, 28, leafColor),
-                      ),
-                    ),
-                  ],
+                  if (isHappy) ..._happyLeaves(swayAngle)
+                  else ..._sadLeaves(swayAngle),
                 ],
               ),
             ),
@@ -209,7 +139,73 @@ class _PlantBody extends StatelessWidget {
     );
   }
 
-  Widget _leaf(double w, double h, Color color) => Container(
+  // ── Happy: two big oval leaves like the Figma design ────────────
+  List<Widget> _happyLeaves(double sway) => [
+        // Left leaf — dark forest green, angled up-left
+        Positioned(
+          left: 6,
+          bottom: 30,
+          child: Transform.rotate(
+            angle: -pi / 3.8 + sway * 0.4,
+            alignment: Alignment.bottomRight,
+            child: _oval(40, 26, AppColors.forest),
+          ),
+        ),
+        // Right leaf — olive, angled up-right, slightly higher
+        Positioned(
+          left: 54,
+          bottom: 38,
+          child: Transform.rotate(
+            angle: pi / 3.8 + sway * 0.4,
+            alignment: Alignment.bottomLeft,
+            child: _oval(36, 23, AppColors.olive),
+          ),
+        ),
+        // Small top bud
+        Positioned(
+          left: 38,
+          bottom: 54,
+          child: Transform.rotate(
+            angle: sway * 0.2,
+            child: _oval(22, 16, AppColors.forest),
+          ),
+        ),
+      ];
+
+  // ── Sad: drooping leaves ─────────────────────────────────────────
+  List<Widget> _sadLeaves(double sway) => [
+        // Left — muted, drooping outward-down
+        Positioned(
+          left: 8,
+          bottom: 18,
+          child: Transform.rotate(
+            angle: -pi / 1.7 + sway,
+            alignment: Alignment.bottomRight,
+            child: _oval(36, 22, AppColors.plantLeafMuted),
+          ),
+        ),
+        // Right — muted, drooping outward-down
+        Positioned(
+          left: 56,
+          bottom: 18,
+          child: Transform.rotate(
+            angle: pi / 1.7 + sway,
+            alignment: Alignment.bottomLeft,
+            child: _oval(36, 22, AppColors.plantLeafMuted),
+          ),
+        ),
+        // Top — slightly wilted, leaning
+        Positioned(
+          left: 34,
+          bottom: 38,
+          child: Transform.rotate(
+            angle: 0.3 + sway * 0.3,
+            child: _oval(20, 14, AppColors.plantLeafMuted),
+          ),
+        ),
+      ];
+
+  Widget _oval(double w, double h, Color color) => Container(
         width: w,
         height: h,
         decoration: ShapeDecoration(
@@ -217,4 +213,36 @@ class _PlantBody extends StatelessWidget {
           shape: const OvalBorder(),
         ),
       );
+
+  /// Simple trapezoid pot shape via CustomPaint.
+  Widget _trapezoidPot() => CustomPaint(
+        size: const Size(64, 44),
+        painter: _TrapezoidPainter(AppColors.potBody),
+      );
+}
+
+class _TrapezoidPainter extends CustomPainter {
+  final Color color;
+  _TrapezoidPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path()
+      ..moveTo(4, 0) // top-left (inset slightly for rim overlap)
+      ..lineTo(size.width - 4, 0) // top-right
+      ..lineTo(size.width - 2, size.height) // bottom-right (slightly wider)
+      ..lineTo(2, size.height) // bottom-left
+      ..close();
+    canvas.drawPath(path, paint);
+    // Rounded corners
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TrapezoidPainter old) => old.color != color;
 }
