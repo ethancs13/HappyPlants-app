@@ -1,19 +1,18 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:happy_plants/models/plant_definition.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 
 class PlantWidget extends StatefulWidget {
   final bool isHappy;
 
-  /// Width of the bounding box. Height = width × 1.6 for drawn widget,
-  /// or width × 1.0 (square) when using SVG assets (Figma frames are 500×500).
+  /// Logical width. Height is determined by the plant's canvas aspect ratio
+  /// (PlantDefinition) or defaults to width × 1.6 for the drawn fallback.
   final double size;
 
-  /// If set (e.g. 'plant_01'), loads SVG assets from
-  ///   assets/images/plants/PLANT_KEY_foliage.svg  (animated)
-  ///   assets/images/plants/PLANT_KEY_pot.svg       (static)
-  /// Otherwise falls back to the drawn widget.
+  /// Key into [kPlantDefinitions] (e.g. 'plant_02').
+  /// Null → drawn fallback widget.
   final String? plantKey;
 
   const PlantWidget({
@@ -30,7 +29,6 @@ class PlantWidget extends StatefulWidget {
 class _PlantWidgetState extends State<PlantWidget>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _sway;
 
   @override
   void initState() {
@@ -40,12 +38,7 @@ class _PlantWidgetState extends State<PlantWidget>
       duration: widget.isHappy
           ? const Duration(milliseconds: 2000)
           : const Duration(milliseconds: 5000),
-    )..repeat(reverse: true);
-
-    final maxAngle = widget.isHappy ? 0.24 : 0.07;
-    _sway = Tween<double>(begin: -maxAngle, end: maxAngle).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    )..repeat();
   }
 
   @override
@@ -56,87 +49,115 @@ class _PlantWidgetState extends State<PlantWidget>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.plantKey != null) {
-      return _SvgPlant(
-        plantKey: widget.plantKey!,
-        isHappy: widget.isHappy,
-        size: widget.size,
-        sway: _sway,
+    final definition = widget.plantKey != null
+        ? kPlantDefinitions[widget.plantKey]
+        : null;
+
+    if (definition != null) {
+      final scale = widget.size / definition.canvasWidth;
+      final height = definition.canvasHeight * scale;
+      return SizedBox(
+        width: widget.size,
+        height: height,
+        child: Transform.scale(
+          scale: scale,
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: definition.canvasWidth,
+            height: definition.canvasHeight,
+            child: _DefinitionPlant(
+              definition: definition,
+              isHappy: widget.isHappy,
+              controller: _controller,
+            ),
+          ),
+        ),
       );
     }
 
-    // Fallback: drawn widget (100×160 native, scaled to fit)
+    // Drawn fallback
     final scale = widget.size / 100.0;
     return SizedBox(
       width: widget.size,
       height: widget.size * 1.6,
       child: AnimatedBuilder(
-        animation: _sway,
-        builder: (_, child) => Transform.scale(
-          scale: scale,
-          alignment: Alignment.bottomCenter,
-          child: _DrawnPlantBody(
-            isHappy: widget.isHappy,
-            swayAngle: _sway.value,
-          ),
-        ),
+        animation: _controller,
+        builder: (_, child) {
+          final maxAngle = widget.isHappy ? 0.24 : 0.07;
+          final sway = sin(_controller.value * 2 * pi) * maxAngle;
+          return Transform.scale(
+            scale: scale,
+            alignment: Alignment.bottomCenter,
+            child: _DrawnPlantBody(isHappy: widget.isHappy, swayAngle: sway),
+          );
+        },
       ),
     );
   }
 }
 
-// ── SVG-based plant ─────────────────────────────────────────────────────────
+// ── Definition-based plant ───────────────────────────────────────────────────
 
-/// Stacks the pot SVG (static) under the foliage SVG (animated sway).
-/// Both assets are 500×500 with transparent backgrounds so they align
-/// automatically when placed at the same size.
-class _SvgPlant extends StatelessWidget {
-  final String plantKey;
+class _DefinitionPlant extends StatelessWidget {
+  final PlantDefinition definition;
   final bool isHappy;
-  final double size;
-  final Animation<double> sway;
+  final AnimationController controller;
 
-  const _SvgPlant({
-    required this.plantKey,
+  const _DefinitionPlant({
+    required this.definition,
     required this.isHappy,
-    required this.size,
-    required this.sway,
+    required this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
-    final foliagePath = 'assets/images/plants/${plantKey}_foliage.svg';
-    final potPath = 'assets/images/plants/${plantKey}_pot.svg';
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, child) {
+        return Stack(
+          clipBehavior: Clip.none,
+          children: definition.parts.map((part) {
+            // Convert bottom-left origin to Flutter's top-left origin
+            final top = definition.canvasHeight - part.bottom - part.height;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        children: [
-          // Foliage — behind the pot, sways around the bottom-center pivot
-          AnimatedBuilder(
-            animation: sway,
-            builder: (_, child) => Transform(
-              alignment: Alignment.bottomCenter,
-              transform: Matrix4.rotationZ(sway.value),
-              child: child,
-            ),
-            child: SvgPicture.asset(
-              foliagePath,
-              width: size,
-              height: size,
-              fit: BoxFit.contain,
-            ),
-          ),
-          // Pot — static, rendered on top so foliage appears to grow from it
-          SvgPicture.asset(
-            potPath,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-          ),
-        ],
-      ),
+            if (part.happyAmplitude == 0) {
+              // Static part (pot)
+              return Positioned(
+                left: part.left,
+                top: top,
+                child: SvgPicture.asset(
+                  part.asset,
+                  width: part.width,
+                  height: part.height,
+                  fit: BoxFit.fill,
+                ),
+              );
+            }
+
+            // Animated leaf — sways around its bottom center
+            final amplitude =
+                isHappy ? part.happyAmplitude : part.happyAmplitude * 0.3;
+            final phase = part.phaseOffset * 2 * pi;
+            final angle =
+                sin(controller.value * 2 * pi + phase) * amplitude;
+
+            return Positioned(
+              left: part.left,
+              top: top,
+              child: Transform(
+                alignment: Alignment.bottomCenter,
+                transform: Matrix4.rotationZ(angle),
+                child: SvgPicture.asset(
+                  part.asset,
+                  width: part.width,
+                  height: part.height,
+                  fit: BoxFit.fill,
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
