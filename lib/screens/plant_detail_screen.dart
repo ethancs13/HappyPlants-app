@@ -199,7 +199,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           const SizedBox(height: 8),
           PlantWidget(
             isHappy: !overdue,
-            size: 100,
+            size: 150,
             plantKey: _plant.plantKey,
           ),
           const SizedBox(height: 16),

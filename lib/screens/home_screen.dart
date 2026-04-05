@@ -31,10 +31,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.cream,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAddPlant,
+        backgroundColor: AppColors.darkOlive,
+        foregroundColor: AppColors.tan,
+        elevation: 3,
+        child: const Icon(Icons.add, size: 28),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(onAddTap: _openAddPlant),
+          const _Header(),
           Expanded(
             child: FutureBuilder<List<Plant>>(
               future: _plantsFuture,
@@ -52,13 +59,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddPlant,
-        backgroundColor: AppColors.darkOlive,
-        foregroundColor: AppColors.tan,
-        elevation: 3,
-        child: const Icon(Icons.add, size: 28),
       ),
     );
   }
@@ -79,9 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final VoidCallback onAddTap;
-
-  const _Header({required this.onAddTap});
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
@@ -93,26 +91,9 @@ class _Header extends StatelessWidget {
         right: 20,
         bottom: 20,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'My Plants',
-            style: Theme.of(context).textTheme.headlineLarge,
-          ),
-          GestureDetector(
-            onTap: onAddTap,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.forest,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.add, color: AppColors.tan, size: 24),
-            ),
-          ),
-        ],
+      child: Text(
+        'My Plants',
+        style: Theme.of(context).textTheme.headlineLarge,
       ),
     );
   }

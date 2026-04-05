@@ -15,11 +15,15 @@ class PlantWidget extends StatefulWidget {
   /// Null → drawn fallback widget.
   final String? plantKey;
 
+  /// When true the plant renders at its rest position with no animation.
+  final bool isStatic;
+
   const PlantWidget({
     super.key,
     required this.isHappy,
     this.size = 120,
     this.plantKey,
+    this.isStatic = false,
   });
 
   @override
@@ -36,9 +40,22 @@ class _PlantWidgetState extends State<PlantWidget>
     _controller = AnimationController(
       vsync: this,
       duration: widget.isHappy
-          ? const Duration(milliseconds: 2000)
-          : const Duration(milliseconds: 5000),
-    )..repeat();
+          ? const Duration(milliseconds: 4000)
+          : const Duration(milliseconds: 8000),
+    );
+    if (!widget.isStatic) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(PlantWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isStatic && !widget.isStatic) {
+      _controller.repeat();
+    } else if (!oldWidget.isStatic && widget.isStatic) {
+      _controller
+        ..stop()
+        ..value = 0;
+    }
   }
 
   @override
@@ -69,6 +86,7 @@ class _PlantWidgetState extends State<PlantWidget>
               definition: definition,
               isHappy: widget.isHappy,
               controller: _controller,
+              isStatic: widget.isStatic,
             ),
           ),
         ),
@@ -102,11 +120,13 @@ class _DefinitionPlant extends StatelessWidget {
   final PlantDefinition definition;
   final bool isHappy;
   final AnimationController controller;
+  final bool isStatic;
 
   const _DefinitionPlant({
     required this.definition,
     required this.isHappy,
     required this.controller,
+    this.isStatic = false,
   });
 
   @override
@@ -138,14 +158,23 @@ class _DefinitionPlant extends StatelessWidget {
             final amplitude =
                 isHappy ? part.happyAmplitude : part.happyAmplitude * 0.3;
             final phase = part.phaseOffset * 2 * pi;
-            final angle =
-                sin(controller.value * 2 * pi + phase) * amplitude;
+            final angle = isStatic
+                ? part.baseAngle
+                : part.baseAngle +
+                    sin(controller.value * 2 * pi + phase) * amplitude;
+
+            // Map model sentinel → Flutter Alignment
+            final pivot = switch (part.swayAlignment.runtimeType.toString()) {
+              '_BottomLeft'  => Alignment.bottomLeft,
+              '_BottomRight' => Alignment.bottomRight,
+              _              => Alignment.bottomCenter,
+            };
 
             return Positioned(
               left: part.left,
               top: top,
               child: Transform(
-                alignment: Alignment.bottomCenter,
+                alignment: pivot,
                 transform: Matrix4.rotationZ(angle),
                 child: SvgPicture.asset(
                   part.asset,

@@ -57,7 +57,13 @@ flutter:
 
   assets:
     - assets/images/plants/
+    - assets/images/plants/plant_01/
     - assets/images/plants/plant_02/
+    - assets/images/plants/plant_03/
+    - assets/images/plants/plant_05/
+    - assets/images/plants/plant_07/
+    - assets/images/plants/plant_14/
+    - assets/images/plants/plant_15/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:happy_plants/models/plant_images.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:happy_plants/widgets/plant_widget.dart';
 
 /// Scrollable 3-column grid of all 15 plant illustrations.
 /// [selectedKey] is the currently selected key (e.g. 'plant_03'), or null.
@@ -69,9 +69,13 @@ class _PlantTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: _PlantPreview(plantKey: plant.key),
+              child: Center(
+                child: PlantWidget(
+                  isHappy: true,
+                  isStatic: !selected,
+                  size: 56,
+                  plantKey: plant.key,
+                ),
               ),
             ),
             Padding(
@@ -95,56 +99,3 @@ class _PlantTile extends StatelessWidget {
   }
 }
 
-/// Static preview stacking foliage behind pot.
-/// Shows a placeholder icon while SVG assets are not yet present.
-class _PlantPreview extends StatelessWidget {
-  final String plantKey;
-
-  const _PlantPreview({required this.plantKey});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.maxWidth;
-        final foliagePath = 'assets/images/plants/${plantKey}_foliage.svg';
-        final potPath = 'assets/images/plants/${plantKey}_pot.svg';
-
-        Widget placeholder(bool isMain) => isMain
-            ? Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.eco_outlined, color: AppColors.olive),
-              )
-            : const SizedBox.shrink();
-
-        return SizedBox(
-          width: size,
-          height: size,
-          child: Stack(
-            children: [
-              SvgPicture.asset(
-                foliagePath,
-                width: size,
-                height: size,
-                fit: BoxFit.contain,
-                placeholderBuilder: (_) => placeholder(true),
-              ),
-              SvgPicture.asset(
-                potPath,
-                width: size,
-                height: size,
-                fit: BoxFit.contain,
-                placeholderBuilder: (_) => placeholder(false),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
