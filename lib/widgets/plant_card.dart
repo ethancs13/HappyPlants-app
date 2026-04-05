@@ -51,7 +51,7 @@ class PlantCard extends StatelessWidget {
               child: Center(
                 child: PlantWidget(
                   isHappy: !overdue,
-                  size: 56,
+                  size: 72,
                   plantKey: plant.plantKey,
                 ),
               ),
