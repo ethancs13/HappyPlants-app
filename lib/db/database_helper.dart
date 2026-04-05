@@ -14,7 +14,12 @@ class DatabaseHelper {
 
   Future<Database> _open() async {
     final path = join(await getDatabasesPath(), 'happy_plants.db');
-    return openDatabase(path, version: 1, onCreate: _onCreate);
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -27,7 +32,7 @@ class DatabaseHelper {
         last_watered_date TEXT,
         last_fertilized_date TEXT,
         notes TEXT,
-        image_path TEXT
+        plant_key TEXT
       )
     ''');
 
@@ -41,6 +46,12 @@ class DatabaseHelper {
         FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE plants ADD COLUMN plant_key TEXT');
+    }
   }
 
   Future<void> close() async => _db?.close();

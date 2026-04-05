@@ -27,7 +27,7 @@ void main() {
                 last_watered_date TEXT,
                 last_fertilized_date TEXT,
                 notes TEXT,
-                image_path TEXT
+                plant_key TEXT
               )
             ''');
           },
