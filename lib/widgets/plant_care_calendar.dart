@@ -73,7 +73,7 @@ class PlantCareCalendar extends StatefulWidget {
 class _PlantCareCalendarState extends State<PlantCareCalendar> {
   static const _colW = 46.0;
   static const _rowH = 52.0;
-  static const _headerH = 40.0;
+  static const _headerH = 48.0;
   static const _labelW = 46.0;
   static const _loadChunk = 14; // days added per edge-load
 
@@ -275,17 +275,16 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 
   Future<void> _onTap(
       DateTime day, _Slot slot, List<CareLog> existing) async {
-    final refresh = await showModalBottomSheet<bool>(
+    final refresh = await showDialog<bool>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _QuickLogSheet(
-        day: day,
-        slot: slot,
-        plant: widget.plant,
-        existing: existing,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: _QuickLogSheet(
+          day: day,
+          slot: slot,
+          plant: widget.plant,
+          existing: existing,
+        ),
       ),
     );
     if (refresh == true && mounted) widget.onRefresh();
@@ -293,18 +292,16 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 
   Future<void> _onLongPress(
       DateTime day, _Slot slot, List<CareLog> existing) async {
-    final refresh = await showModalBottomSheet<bool>(
+    final refresh = await showDialog<bool>(
       context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _CustomLogSheet(
-        day: day,
-        slot: slot,
-        plant: widget.plant,
-        existing: existing,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: _CustomLogSheet(
+          day: day,
+          slot: slot,
+          plant: widget.plant,
+          existing: existing,
+        ),
       ),
     );
     if (refresh == true && mounted) widget.onRefresh();
@@ -343,42 +340,33 @@ class _DayHeader extends StatelessWidget {
               color: isToday ? AppColors.darkOlive : AppColors.textMuted,
             ),
           ),
-          const SizedBox(height: 3),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: isToday
-                    ? const BoxDecoration(
-                        color: AppColors.darkOlive, shape: BoxShape.circle)
-                    : null,
-                child: Center(
-                  child: Text(
-                    '${day.day}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isToday ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
+          const SizedBox(height: 2),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: isToday
+                ? const BoxDecoration(
+                    color: AppColors.darkOlive, shape: BoxShape.circle)
+                : null,
+            child: Center(
+              child: Text(
+                '${day.day}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isToday ? Colors.white : AppColors.textPrimary,
                 ),
               ),
-              if (hasPhoto)
-                Positioned(
-                  top: -3,
-                  right: -3,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: _waterColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: hasPhoto ? _waterColor : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
           ),
         ],
       ),
