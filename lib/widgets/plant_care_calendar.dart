@@ -931,47 +931,25 @@ class _RadialMenuState extends State<_RadialMenu>
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
-    required String label,
   }) {
     return Positioned(
-      left: offset.dx - 22,
-      top: offset.dy - 22,
+      left: offset.dx - 28,
+      top: offset.dy - 28,
       child: ScaleTransition(
         scale: _scale,
         child: GestureDetector(
           onTap: onTap,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 8)
-                  ],
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 10)
+              ],
+            ),
+            child: Icon(icon, color: color, size: 24),
           ),
         ),
       ),
@@ -987,22 +965,20 @@ class _RadialMenuState extends State<_RadialMenu>
       child: SizedBox.expand(
         child: Stack(
           children: [
-            // 12 o'clock — Edit / Add
+            // 11 o'clock — Edit / Add
             _bubble(
-              offset: Offset(a.dx, a.dy - 68),
+              offset: Offset(a.dx - 20, a.dy - 90),
               icon: Icons.edit_outlined,
               color: AppColors.darkOlive,
               onTap: widget.onEdit,
-              label: 'Edit',
             ),
-            // 2-3 o'clock — Delete (only if logs exist)
+            // 1-2 o'clock — Delete (only if logs exist)
             if (widget.onDelete != null)
               _bubble(
-                offset: Offset(a.dx + 52, a.dy - 42),
+                offset: Offset(a.dx + 70, a.dy - 70),
                 icon: Icons.delete_outline,
                 color: AppColors.statusRed,
                 onTap: widget.onDelete!,
-                label: 'Delete',
               ),
           ],
         ),
