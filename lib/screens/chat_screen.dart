@@ -103,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (savedMessages.isEmpty) {
         _messages.add(_ChatMessage(
           text:
-              "Hi! I'm $_botName 🌿 I can identify plants from photos, "
+              "Hi! I'm $_botName. I can identify plants from photos, "
               "diagnose ailments, and answer any plant care questions. "
               "Share a photo or ask me anything!",
           isUser: false,
