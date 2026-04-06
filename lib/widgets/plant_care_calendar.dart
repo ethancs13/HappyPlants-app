@@ -229,39 +229,53 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                         }),
                       ),
                     ),
-                    // One row per time slot
-                    ..._Slot.values.map((slot) => SizedBox(
-                          height: _rowH,
-                          child: Row(
-                            children: List.generate(_totalDays, (i) {
-                              final day = _dayAt(i);
-                              final dayStr = _dk(day);
-                              final key = '$dayStr|${slot.name}';
-                              final cellLogs = logMap[key] ?? [];
-                              final isFuture = day.isAfter(_today);
-                              final isScheduled = scheduled.contains(dayStr) &&
-                                  slot == _Slot.morning &&
-                                  isFuture;
+                    // Slot area — column-first so today can span both rows
+                    SizedBox(
+                      height: _Slot.values.length * _rowH,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: List.generate(_totalDays, (i) {
+                          final day = _dayAt(i);
+                          final isToday = day == _today;
+                          final dayStr = _dk(day);
+                          final isFuture = day.isAfter(_today);
 
-                              return _CalendarCell(
-                                width: _colW,
-                                height: _rowH,
-                                logs: cellLogs,
-                                isScheduled: isScheduled,
-                                isToday: day == _today,
-                                isFuture: isFuture,
-                                // Tap on future non-scheduled cells does nothing
-                                onTap: isFuture && !isScheduled
-                                    ? null
-                                    : () => _onTap(day, slot, cellLogs),
-                                onLongPressStart: isFuture
-                                    ? null
-                                    : (pos) => _onLongPress(
-                                        day, slot, cellLogs, pos),
-                              );
-                            }),
-                          ),
-                        )),
+                          final cells = _Slot.values.map((slot) {
+                            final key = '$dayStr|${slot.name}';
+                            final cellLogs = logMap[key] ?? [];
+                            final isScheduled =
+                                scheduled.contains(dayStr) &&
+                                    slot == _Slot.morning &&
+                                    isFuture;
+                            return _CalendarCell(
+                              width: _colW,
+                              height: _rowH,
+                              logs: cellLogs,
+                              isScheduled: isScheduled,
+                              isFuture: isFuture,
+                              onTap: () => _onTap(day, slot, cellLogs),
+                              onLongPressStart: (pos) =>
+                                  _onLongPress(day, slot, cellLogs, pos),
+                            );
+                          }).toList();
+
+                          if (isToday) {
+                            return Container(
+                              width: _colW,
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 1.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: AppColors.darkOlive, width: 1.5),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              child: Column(children: cells),
+                            );
+                          }
+                          return Column(children: cells);
+                        }),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -419,7 +433,6 @@ class _CalendarCell extends StatelessWidget {
   final double height;
   final List<CareLog> logs;
   final bool isScheduled;
-  final bool isToday;
   final bool isFuture;
   final VoidCallback? onTap;
   final void Function(Offset globalPosition)? onLongPressStart;
@@ -429,7 +442,6 @@ class _CalendarCell extends StatelessWidget {
     required this.height,
     required this.logs,
     required this.isScheduled,
-    required this.isToday,
     required this.isFuture,
     required this.onTap,
     required this.onLongPressStart,
@@ -459,9 +471,7 @@ class _CalendarCell extends StatelessWidget {
     final last = hasLog ? logs.last : null;
 
     BoxBorder? border;
-    if (isToday && !hasLog) {
-      border = Border.all(color: AppColors.darkOlive, width: 1.5);
-    } else if (isScheduled && !hasLog) {
+    if (isScheduled && !hasLog) {
       border = Border.all(
           color: AppColors.statusGreen.withValues(alpha: 0.5), width: 1);
     }
