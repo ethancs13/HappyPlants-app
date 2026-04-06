@@ -929,27 +929,30 @@ class _RadialMenuState extends State<_RadialMenu>
   Widget _bubble({
     required Offset offset,
     required IconData icon,
-    required Color color,
+    required Color iconColor,
+    required Color bgColor,
     required VoidCallback onTap,
+    double size = 56,
   }) {
+    final half = size / 2;
     return Positioned(
-      left: offset.dx - 28,
-      top: offset.dy - 28,
+      left: offset.dx - half,
+      top: offset.dy - half,
       child: ScaleTransition(
         scale: _scale,
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 56,
-            height: 56,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: bgColor,
               shape: BoxShape.circle,
               boxShadow: const [
                 BoxShadow(color: Colors.black26, blurRadius: 10)
               ],
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: iconColor, size: size * 0.43),
           ),
         ),
       ),
@@ -965,11 +968,12 @@ class _RadialMenuState extends State<_RadialMenu>
       child: SizedBox.expand(
         child: Stack(
           children: [
-            // 11 o'clock — Edit / Add
+            // 11 o'clock — Edit
             _bubble(
               offset: Offset(a.dx - 20, a.dy - 90),
               icon: Icons.edit_outlined,
-              color: AppColors.darkOlive,
+              iconColor: Colors.white,
+              bgColor: AppColors.darkOlive,
               onTap: widget.onEdit,
             ),
             // 1-2 o'clock — Delete (only if logs exist)
@@ -977,8 +981,10 @@ class _RadialMenuState extends State<_RadialMenu>
               _bubble(
                 offset: Offset(a.dx + 70, a.dy - 70),
                 icon: Icons.delete_outline,
-                color: AppColors.statusRed,
+                iconColor: Colors.white,
+                bgColor: AppColors.statusRed,
                 onTap: widget.onDelete!,
+                size: 44,
               ),
           ],
         ),
