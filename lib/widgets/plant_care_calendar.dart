@@ -992,7 +992,7 @@ class _RadialMenuState extends State<_RadialMenu>
           children: [
             // 11 o'clock — Edit
               _bubble(
-                offset: Offset(a.dx, a.dy - 80),
+                offset: Offset(a.dx, a.dy - 70),
                 icon: Icons.edit_outlined,
                 iconColor: Colors.white,
                 bgColor: AppColors.darkOlive,
@@ -1001,7 +1001,7 @@ class _RadialMenuState extends State<_RadialMenu>
             // 1-2 o'clock — Delete (only if logs exist)
             if (widget.onDelete != null)
               _bubble(
-                offset: Offset(a.dx, a.dy - 140),
+                offset: Offset(a.dx, a.dy + 60),
                 icon: Icons.delete_outline,
                 iconColor: Colors.white,
                 bgColor: AppColors.statusRed,
