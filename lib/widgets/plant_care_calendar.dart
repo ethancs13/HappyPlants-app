@@ -8,25 +8,22 @@ import 'package:happy_plants/theme/app_theme.dart';
 
 // ── Time slots ────────────────────────────────────────────────────────────────
 
-enum _Slot { morning, afternoon, evening }
+enum _Slot { morning, afternoon }
 
 extension _SlotX on _Slot {
   String get label => switch (this) {
         _Slot.morning => 'AM',
         _Slot.afternoon => 'PM',
-        _Slot.evening => 'Eve',
       };
 
   int get defaultHour => switch (this) {
         _Slot.morning => 9,
         _Slot.afternoon => 14,
-        _Slot.evening => 19,
       };
 
   static _Slot fromHour(int hour) {
     if (hour < 12) return _Slot.morning;
-    if (hour < 18) return _Slot.afternoon;
-    return _Slot.evening;
+    return _Slot.afternoon;
   }
 }
 
