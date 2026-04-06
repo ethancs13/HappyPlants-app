@@ -469,28 +469,30 @@ class _CalendarCell extends StatelessWidget {
           color: AppColors.statusGreen.withValues(alpha: 0.5), width: 1);
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPressStart: onLongPressStart == null
-          ? null
-          : (d) => onLongPressStart!(d.globalPosition),
-      child: Container(
-        width: width,
-        height: height,
-        margin: const EdgeInsets.all(1.5),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(7),
-          border: border,
+    return SizedBox(
+      width: width,
+      height: height,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPressStart: onLongPressStart == null
+            ? null
+            : (d) => onLongPressStart!(d.globalPosition),
+        child: Container(
+          margin: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(7),
+            border: border,
+          ),
+          child: hasLog
+              ? _logContent(last!)
+              : isScheduled
+                  ? const Center(
+                      child: Icon(Icons.water_drop,
+                          size: 14, color: AppColors.statusGreen),
+                    )
+                  : null,
         ),
-        child: hasLog
-            ? _logContent(last!)
-            : isScheduled
-                ? const Center(
-                    child: Icon(Icons.water_drop,
-                        size: 14, color: AppColors.statusGreen),
-                  )
-                : null,
       ),
     );
   }
@@ -969,17 +971,17 @@ class _RadialMenuState extends State<_RadialMenu>
         child: Stack(
           children: [
             // 11 o'clock — Edit
-            _bubble(
-              offset: Offset(a.dx - 20, a.dy - 90),
-              icon: Icons.edit_outlined,
-              iconColor: Colors.white,
-              bgColor: AppColors.darkOlive,
-              onTap: widget.onEdit,
-            ),
+              _bubble(
+                offset: Offset(a.dx, a.dy - 80),
+                icon: Icons.edit_outlined,
+                iconColor: Colors.white,
+                bgColor: AppColors.darkOlive,
+                onTap: widget.onEdit,
+              ),
             // 1-2 o'clock — Delete (only if logs exist)
             if (widget.onDelete != null)
               _bubble(
-                offset: Offset(a.dx + 70, a.dy - 70),
+                offset: Offset(a.dx, a.dy - 140),
                 icon: Icons.delete_outline,
                 iconColor: Colors.white,
                 bgColor: AppColors.statusRed,
