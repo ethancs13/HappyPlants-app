@@ -1,3 +1,8 @@
+# Node / npm tooling (sharp, etc.)
+node_modules/
+package.json
+package-lock.json
+
 # Miscellaneous
 *.class
 *.log

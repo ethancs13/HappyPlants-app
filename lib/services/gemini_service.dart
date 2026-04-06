@@ -19,6 +19,7 @@ class GeminiService {
   static const _preferred = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-preview-05-20',
+    'gemini-2.0-flash-lite',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
@@ -116,6 +117,32 @@ class GeminiService {
             'required': ['plant_id', 'type'],
           },
         },
+        {
+          'name': 'add_photo',
+          'description':
+              'Save the image the user just shared in chat to a plant\'s photo journal. '
+              'Only call this when the user has sent an image in the current message. '
+              'If there is no image in the conversation, tell the user to share one first.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'plant_id': {
+                'type': 'INTEGER',
+                'description': 'ID of the plant to add the photo to.',
+              },
+              'notes': {
+                'type': 'STRING',
+                'description': 'Optional caption or notes for the photo.',
+              },
+              'set_as_cover': {
+                'type': 'BOOLEAN',
+                'description':
+                    'If true, set this photo as the plant\'s cover image.',
+              },
+            },
+            'required': ['plant_id'],
+          },
+        },
       ],
     },
   ];
@@ -128,9 +155,13 @@ class GeminiService {
 
   GeminiService._(this._model, this._history);
 
-  static Future<GeminiService> create({List<Plant> plants = const []}) async {
+  static Future<GeminiService> create({
+    List<Plant> plants = const [],
+    String botName = 'PlantBot',
+    List<Map<String, dynamic>> resumedHistory = const [],
+  }) async {
     final model = await _detectModel();
-    final prompt = _buildSystemPrompt(plants);
+    final prompt = _buildSystemPrompt(plants, botName);
     return GeminiService._(model, [
       {
         'role': 'user',
@@ -141,14 +172,20 @@ class GeminiService {
         'parts': [
           {
             'text':
-                "Understood! I'm PlantBot, your expert plant care assistant. "
+                "Understood! I'm $botName, your expert plant care assistant. "
                 "I can identify plants, diagnose ailments, answer care questions, "
                 "and manage your plant collection directly.",
           },
         ],
       },
+      ...resumedHistory,
     ]);
   }
+
+  /// All conversation turns after the initial system-prompt exchange.
+  /// Use this to snapshot new turns for persistence.
+  List<Map<String, dynamic>> get conversationHistory =>
+      _history.length > 2 ? List.unmodifiable(_history.sublist(2)) : const [];
 
   bool get isConfigured => _apiKey.isNotEmpty;
   String get model => _model;
@@ -324,10 +361,10 @@ class GeminiService {
     return 'gemini-2.0-flash';
   }
 
-  static String _buildSystemPrompt(List<Plant> plants) {
+  static String _buildSystemPrompt(List<Plant> plants, [String botName = 'PlantBot']) {
     final buffer = StringBuffer()
       ..writeln(
-        'You are PlantBot, an expert botanist and plant care specialist '
+        'You are $botName, an expert botanist and plant care specialist '
         'built into the HappyPlants app.',
       )
       ..writeln(
@@ -344,10 +381,11 @@ class GeminiService {
       )
       ..writeln(
         '- Manage the user\'s plant collection using the provided tools '
-        '(add_plant, update_plant, delete_plant, log_care). '
-        'When the user asks to add, change, delete, or log care for a plant, '
-        'call the appropriate tool without asking for confirmation — just do it '
-        'and briefly confirm what you did.',
+        '(add_plant, update_plant, delete_plant, log_care, add_photo). '
+        'When the user asks to add, change, delete, log care, or save a photo '
+        'for a plant, call the appropriate tool without asking for confirmation '
+        '— just do it and briefly confirm what you did. '
+        'Use add_photo only when the user has shared an image in the current message.',
       )
       ..writeln()
       ..writeln(
