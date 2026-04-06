@@ -53,6 +53,7 @@ class PlantCareCalendar extends StatefulWidget {
   final Plant plant;
   final List<CareLog> logs;
   final List<PlantPhoto> photos;
+  final ScrollController? parentScrollController;
   final VoidCallback onRefresh;
 
   const PlantCareCalendar({
@@ -60,6 +61,7 @@ class PlantCareCalendar extends StatefulWidget {
     required this.plant,
     required this.logs,
     required this.photos,
+    this.parentScrollController,
     required this.onRefresh,
   });
 
@@ -89,6 +91,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     _today = DateTime(now.year, now.month, now.day);
     _start = _today.subtract(Duration(days: _pastDays));
     _scroll.addListener(_onScroll);
+    widget.parentScrollController?.addListener(_dismissRadialMenu);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToToday());
   }
 
@@ -101,6 +104,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
+    _dismissRadialMenu();
     final pos = _scroll.position;
     // Near left edge — prepend past days
     if (pos.pixels < _colW * 3) {
@@ -129,6 +133,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     _dismissRadialMenu();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
+    widget.parentScrollController?.removeListener(_dismissRadialMenu);
     super.dispose();
   }
 

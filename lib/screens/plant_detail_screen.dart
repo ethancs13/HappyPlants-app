@@ -29,6 +29,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   List<PlantPhoto> _photos = [];
   bool _actionPending = false;
   final _picker = ImagePicker();
+  final _pageScroll = ScrollController();
 
   @override
   void initState() {
@@ -36,6 +37,12 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     _plant = widget.plant;
     _refreshLogs();
     _refreshPhotos();
+  }
+
+  @override
+  void dispose() {
+    _pageScroll.dispose();
+    super.dispose();
   }
 
   Future<void> _refreshLogs() async {
@@ -257,6 +264,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           _buildHeader(context, overdue),
           Expanded(
             child: SingleChildScrollView(
+              controller: _pageScroll,
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -393,6 +401,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                     plant: _plant,
                     logs: _logs,
                     photos: _photos,
+                    parentScrollController: _pageScroll,
                     onRefresh: () {
                       _refreshLogs();
                       _refreshPhotos();
