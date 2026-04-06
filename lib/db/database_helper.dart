@@ -16,7 +16,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'happy_plants.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -58,6 +58,31 @@ class DatabaseHelper {
         FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT NOT NULL,
+        is_user INTEGER NOT NULL,
+        is_context INTEGER NOT NULL DEFAULT 0,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE gemini_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        parts TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -74,6 +99,30 @@ class DatabaseHelper {
           is_cover INTEGER NOT NULL DEFAULT 0,
           notes TEXT,
           FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE chat_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          text TEXT NOT NULL,
+          is_user INTEGER NOT NULL,
+          is_context INTEGER NOT NULL DEFAULT 0,
+          timestamp TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE gemini_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          role TEXT NOT NULL,
+          parts TEXT NOT NULL
         )
       ''');
     }

@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:happy_plants/models/care_log.dart';
 import 'package:happy_plants/models/plant.dart';
+import 'package:happy_plants/models/plant_photo.dart';
 import 'package:happy_plants/repositories/care_log_repository.dart';
+import 'package:happy_plants/repositories/chat_repository.dart';
 import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
+import 'package:happy_plants/repositories/settings_repository.dart';
 import 'package:happy_plants/services/gemini_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 
@@ -48,33 +54,119 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final _messages = <_ChatMessage>[];
   GeminiService? _gemini;
+  ChatRepository? _chatRepo;
+  SettingsRepository? _settingsRepo;
+
   bool _isStreaming = false;
+  bool _isLoading = true;
   Uint8List? _pendingImage;
+
+  /// Image bytes from the message currently being streamed.
+  /// Available to the function-call handler for add_photo.
+  Uint8List? _currentImageBytes;
+
   List<Plant> _allPlants = [];
   Plant? _contextPlant;
+  String _botName = 'PlantBot';
 
   @override
   void initState() {
     super.initState();
-    _messages.add(const _ChatMessage(
-      text:
-          "Hi! I'm PlantBot 🌿 I can identify plants from photos, diagnose ailments, "
-          "and answer any plant care questions. Share a photo or ask me anything!",
-      isUser: false,
-    ));
-    _initGemini();
+    _init();
   }
 
-  Future<void> _initGemini() async {
-    final repo = await PlantRepository.create();
-    final plants = await repo.getAll();
-    final gemini = await GeminiService.create(plants: plants);
+  Future<void> _init() async {
+    final chatRepo = await ChatRepository.create();
+    final settingsRepo = await SettingsRepository.create();
+    final plantRepo = await PlantRepository.create();
+
+    final botName = await settingsRepo.get('bot_name') ?? 'PlantBot';
+    final savedMessages = await chatRepo.getMessages();
+    final savedHistory = await chatRepo.getGeminiHistory();
+    final plants = await plantRepo.getAll();
+
+    final gemini = await GeminiService.create(
+      plants: plants,
+      botName: botName,
+      resumedHistory: savedHistory,
+    );
+
     if (!mounted) return;
     setState(() {
+      _chatRepo = chatRepo;
+      _settingsRepo = settingsRepo;
+      _botName = botName;
       _allPlants = plants;
       _gemini = gemini;
+      _isLoading = false;
+
+      if (savedMessages.isEmpty) {
+        _messages.add(_ChatMessage(
+          text:
+              "Hi! I'm $_botName 🌿 I can identify plants from photos, "
+              "diagnose ailments, and answer any plant care questions. "
+              "Share a photo or ask me anything!",
+          isUser: false,
+        ));
+      } else {
+        for (final m in savedMessages) {
+          _messages.add(_ChatMessage(
+            text: m.text,
+            isUser: m.isUser,
+            isContext: m.isContext,
+          ));
+        }
+      }
     });
+    _scrollToBottom();
   }
+
+  // ── Bot renaming ─────────────────────────────────────────────────────────
+
+  Future<void> _renameBotDialog() async {
+    if (_isLoading) return;
+
+    // Use a ValueNotifier so the dialog can read the latest text on Save
+    // without holding a TextEditingController that we'd need to dispose.
+    final initialName = _botName;
+    String pendingName = initialName;
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController(text: initialName);
+        return AlertDialog(
+          title: const Text('Name your assistant'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration:
+                const InputDecoration(hintText: 'e.g. Fern, Leafy, Sprout'),
+            onChanged: (v) => pendingName = v,
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, pendingName.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (newName == null || newName.isEmpty || newName == _botName) return;
+    setState(() => _botName = newName);
+    await _settingsRepo?.set('bot_name', newName);
+  }
+
+  // ── Plant picker ─────────────────────────────────────────────────────────
 
   Future<void> _showPlantPicker() async {
     if (_allPlants.isEmpty) return;
@@ -165,7 +257,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() => _contextPlant = plant);
 
-    // Build context string
     final buf = StringBuffer()
       ..writeln(
           'I want to discuss my plant "${plant.name}" (${plant.species}).')
@@ -193,15 +284,17 @@ class _ChatScreenState extends State<ChatScreen> {
       buf.writeln('No care history logged yet.');
     }
 
+    final prevHistLen = _gemini?.conversationHistory.length ?? 0;
     _gemini?.injectPlantContext(buf.toString());
 
-    setState(() {
-      _messages.add(_ChatMessage(
-        text: 'Context added: ${plant.name}',
-        isUser: false,
-        isContext: true,
-      ));
-    });
+    final contextMsg = _ChatMessage(
+      text: 'Context added: ${plant.name}',
+      isUser: false,
+      isContext: true,
+    );
+    setState(() => _messages.add(contextMsg));
+    _persistMessage(contextMsg);
+    _persistNewHistoryTurns(prevHistLen);
     _scrollToBottom();
   }
 
@@ -215,7 +308,26 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  // ── Function call handler ────────────────────────────────────────────────
+  // ── Persistence helpers ───────────────────────────────────────────────────
+
+  Future<void> _persistMessage(_ChatMessage msg) async {
+    await _chatRepo?.insertMessage(PersistedMessage(
+      text: msg.text,
+      isUser: msg.isUser,
+      isContext: msg.isContext,
+      timestamp: DateTime.now(),
+    ));
+  }
+
+  Future<void> _persistNewHistoryTurns(int prevLength) async {
+    if (_chatRepo == null || _gemini == null) return;
+    final history = _gemini!.conversationHistory;
+    if (history.length <= prevLength) return;
+    final newTurns = history.sublist(prevLength).cast<Map<String, dynamic>>();
+    await _chatRepo!.appendGeminiTurns(newTurns);
+  }
+
+  // ── Function call handler ─────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _handleFunctionCall(
     String name,
@@ -295,6 +407,49 @@ class _ChatScreenState extends State<ChatScreen> {
           );
           return {'success': true};
 
+        case 'add_photo':
+          final bytes = _currentImageBytes;
+          if (bytes == null) {
+            return {
+              'success': false,
+              'error': 'No image in the current message to save.',
+            };
+          }
+          final plantId = args['plant_id'] as int;
+          final notes = args['notes'] as String?;
+          final setAsCover = (args['set_as_cover'] as bool?) ?? false;
+
+          final appDir = await getApplicationDocumentsDirectory();
+          final photosDir =
+              Directory(p.join(appDir.path, 'plant_photos'));
+          if (!await photosDir.exists()) {
+            await photosDir.create(recursive: true);
+          }
+          final fileName =
+              '${plantId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final destPath = p.join(photosDir.path, fileName);
+          await File(destPath).writeAsBytes(bytes);
+
+          final photoRepo = await PlantPhotoRepository.create();
+          final existing = await photoRepo.getByPlantId(plantId);
+          final isFirst = existing.isEmpty;
+
+          final photo = await photoRepo.insert(PlantPhoto(
+            plantId: plantId,
+            filePath: destPath,
+            dateTaken: DateTime.now(),
+            isCover: isFirst || setAsCover,
+            notes: notes,
+          ));
+          if (!isFirst && setAsCover) {
+            await photoRepo.setCover(plantId, photo.id!);
+          }
+
+          final plantRepo = await PlantRepository.create();
+          final plant = await plantRepo.getById(plantId);
+          _showCollectionChip('Photo saved to ${plant?.name ?? 'plant'}');
+          return {'success': true, 'photo_id': photo.id};
+
         default:
           return {'success': false, 'error': 'Unknown function: $name'};
       }
@@ -312,17 +467,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showCollectionChip(String label) {
     if (!mounted) return;
-    setState(() {
-      _messages.add(_ChatMessage(
-        text: label,
-        isUser: false,
-        isContext: true,
-      ));
-    });
+    final msg = _ChatMessage(text: label, isUser: false, isContext: true);
+    setState(() => _messages.add(msg));
+    _persistMessage(msg);
     _scrollToBottom();
   }
 
-  // ── Messaging ───────────────────────────────────────────────────────────
+  // ── Messaging ─────────────────────────────────────────────────────────────
 
   Future<void> _sendMessage() async {
     if (_gemini == null) return;
@@ -341,20 +492,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final imageBytes = _pendingImage;
+    _currentImageBytes = imageBytes;
+    final userMsg = _ChatMessage(
+      text: text,
+      isUser: true,
+      imageBytes: imageBytes,
+    );
     setState(() {
-      _messages.add(_ChatMessage(
-        text: text,
-        isUser: true,
-        imageBytes: imageBytes,
-      ));
+      _messages.add(userMsg);
       _pendingImage = null;
       _isStreaming = true;
     });
     _textController.clear();
+    _persistMessage(userMsg);
     _scrollToBottom();
 
     setState(() => _messages.add(const _ChatMessage(text: '', isUser: false)));
     final aiIndex = _messages.length - 1;
+    final prevHistLen = _gemini!.conversationHistory.length;
 
     try {
       final stream = _gemini!.sendMessageStream(
@@ -379,6 +534,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (!mounted) return;
     setState(() => _isStreaming = false);
+    _currentImageBytes = null;
+
+    // Persist completed AI message and any new Gemini history turns.
+    _persistMessage(_messages[aiIndex]);
+    _persistNewHistoryTurns(prevHistLen);
     _scrollToBottom();
   }
 
@@ -469,7 +629,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _pendingImage = bytes);
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -493,8 +653,7 @@ class _ChatScreenState extends State<ChatScreen> {
       onTap: hasPlants ? _showPlantPicker : null,
       child: Container(
         color: AppColors.cardBg,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             Icon(
@@ -522,8 +681,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             if (hasPlants)
-              Icon(Icons.chevron_right,
-                  size: 16, color: AppColors.textMuted),
+              Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
           ],
         ),
       ),
@@ -552,30 +710,58 @@ class _ChatScreenState extends State<ChatScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.forest,
-              border: Border.all(color: AppColors.tan.withValues(alpha: 0.3), width: 1.5),
+              border: Border.all(
+                  color: AppColors.tan.withValues(alpha: 0.3), width: 1.5),
             ),
             child: const Icon(Icons.eco, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Plant Assistant',
-                style: TextStyle(
-                  color: AppColors.tan,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+          Expanded(
+            child: GestureDetector(
+              onTap: _renameBotDialog,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _isLoading ? 'Loading...' : _botName,
+                                style: const TextStyle(
+                                  color: AppColors.tan,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.edit,
+                              size: 12,
+                              color: AppColors.tan.withValues(alpha: 0.6),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          _gemini == null
+                              ? 'Connecting...'
+                              : _gemini!.model,
+                          style: TextStyle(
+                            color: AppColors.tan.withValues(alpha: 0.7),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                _gemini == null ? 'Connecting...' : _gemini!.model,
-                style: TextStyle(
-                  color: AppColors.tan.withValues(alpha: 0.7),
-                  fontSize: 11,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -583,10 +769,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageList() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: _messages.length + (_isStreaming && _messages.last.text.isEmpty ? 0 : 0),
+      itemCount: _messages.length,
       itemBuilder: (context, i) {
         final msg = _messages[i];
         final isCurrentlyStreaming =
@@ -664,7 +853,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               decoration: InputDecoration(
                 hintText: _gemini == null
-                    ? 'Connecting to PlantBot...'
+                    ? 'Connecting to $_botName...'
                     : 'Ask about your plants…',
                 hintStyle: const TextStyle(
                   color: AppColors.textMuted,
@@ -672,8 +861,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 filled: true,
                 fillColor: AppColors.cardBg,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(22),
                   borderSide: BorderSide.none,
@@ -684,8 +873,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(22),
-                  borderSide: const BorderSide(
-                      color: AppColors.forest, width: 1.5),
+                  borderSide:
+                      const BorderSide(color: AppColors.forest, width: 1.5),
                 ),
               ),
               onSubmitted: (_) => _sendMessage(),
@@ -722,8 +911,7 @@ class _MessageBubble extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Center(
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: AppColors.statusGreenBg,
             borderRadius: BorderRadius.circular(12),
@@ -758,7 +946,8 @@ class _MessageBubble extends StatelessWidget {
           Flexible(
             child: Container(
               constraints: const BoxConstraints(maxWidth: 280),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: const BoxDecoration(
                 color: AppColors.darkOlive,
                 borderRadius: BorderRadius.only(
@@ -815,14 +1004,14 @@ class _MessageBubble extends StatelessWidget {
               shape: BoxShape.circle,
               color: AppColors.forest,
             ),
-            child:
-                const Icon(Icons.eco, size: 16, color: Colors.white),
+            child: const Icon(Icons.eco, size: 16, color: Colors.white),
           ),
           const SizedBox(width: 8),
           Flexible(
             child: Container(
               constraints: const BoxConstraints(maxWidth: 280),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.only(
