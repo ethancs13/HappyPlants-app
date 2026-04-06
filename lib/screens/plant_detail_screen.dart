@@ -854,7 +854,7 @@ class _SoilPainter extends CustomPainter {
   ));
 
   // Solid soil starts at 48% of the widget height
-  static const _solidStart = 0.48;
+  static const _solidStart = 0.34;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -912,7 +912,7 @@ class _SoilPainter extends CustomPainter {
     // Zone extends from 0 to solidY + small overlap into solid.
     // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
     // No opacity change — size alone creates the fade effect.
-    final specZoneH = solidY * 0.9;
+    final specZoneH = solidY * 1.4;
     final maxSpecR = size.width / 7;
     final specPaint = Paint();
     for (final s in _specs) {
