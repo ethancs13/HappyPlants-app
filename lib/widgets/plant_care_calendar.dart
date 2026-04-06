@@ -491,7 +491,12 @@ class _CalendarCell extends StatelessWidget {
         onTap: onTap,
         onLongPressStart: onLongPressStart == null
             ? null
-            : (d) => onLongPressStart!(d.globalPosition),
+            : (_) {
+                final box = context.findRenderObject()! as RenderBox;
+                final center =
+                    box.localToGlobal(box.size.center(Offset.zero));
+                onLongPressStart!(center);
+              },
         child: Container(
           margin: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
