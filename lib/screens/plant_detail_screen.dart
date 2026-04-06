@@ -898,11 +898,12 @@ class _SoilPainter extends CustomPainter {
     // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
     // No opacity change — size alone creates the fade effect.
     final specZoneH = solidY * 1.08;
+    final maxSpecR = size.width / 8;
     final specPaint = Paint()..color = const Color(0xFF5C3517);
     for (final s in _specs) {
       final y = s.ty * specZoneH;
       final depthT = (y / specZoneH).clamp(0.0, 1.0);
-      final r = (0.4 + s.baseR * 4.6) * depthT * depthT;
+      final r = (0.4 + s.baseR * (maxSpecR - 0.4)) * depthT * depthT;
       if (r < 0.3) continue;
       canvas.drawCircle(Offset(s.tx * size.width, y), r, specPaint);
     }
