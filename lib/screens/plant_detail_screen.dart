@@ -825,13 +825,9 @@ class _SoilPainter extends CustomPainter {
     Color(0xFF5C3517), // dark brown
     Color(0xFF7A4F28), // medium brown
     Color(0xFF3B2009), // near-black earth
-    Color(0xFF9B6B3A), // warm tan
-    Color(0xFF8B4513), // saddle brown
-    Color(0xFF6B3A1F), // red-clay
-    Color(0xFFB08B5A), // sandy
   ];
 
-  static final _specs = List.generate(500, (_) {
+  static final _specs = List.generate(200, (_) {
     final t = _specRng.nextDouble();
     return (
       tx: _specRng.nextDouble(),
@@ -844,7 +840,7 @@ class _SoilPainter extends CustomPainter {
   // Rocks — only in solid portion
   static final _rocks = List.generate(26, (_) => (
     tx: _rockRng.nextDouble(),
-    ty: 0.60 + _rockRng.nextDouble() * 0.40,
+    ty: 0.48 + _rockRng.nextDouble() * 0.52,
     w: 7.0 + _rockRng.nextDouble() * 22,
     h: 5.0 + _rockRng.nextDouble() * 13,
     dark: _rockRng.nextBool(),
@@ -853,12 +849,12 @@ class _SoilPainter extends CustomPainter {
   // Fine texture dots — only in solid portion
   static final _dots = List.generate(70, (_) => (
     tx: _rockRng.nextDouble(),
-    ty: 0.58 + _rockRng.nextDouble() * 0.42,
+    ty: 0.48 + _rockRng.nextDouble() * 0.52,
     r: 0.8 + _rockRng.nextDouble() * 1.8,
   ));
 
-  // Solid soil starts at 60% of the widget height — long transition above
-  static const _solidStart = 0.60;
+  // Solid soil starts at 48% of the widget height
+  static const _solidStart = 0.48;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -870,13 +866,21 @@ class _SoilPainter extends CustomPainter {
       Paint()..color = const Color(0xFF5C3517),
     );
 
-    // ── Sub-layers ─────────────────────────────────────────────────────
+    // ── Sub-layers (4 layers, evenly spaced across solid portion) ──────
     canvas.drawPath(
-      _wavyLayer(size, size.height * 0.72, Random(3)),
+      _wavyLayer(size, size.height * 0.60, Random(3)),
+      Paint()..color = const Color(0xFF6B3E1A),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.70, Random(19)),
       Paint()..color = const Color(0xFF7A4F28),
     );
     canvas.drawPath(
-      _wavyLayer(size, size.height * 0.86, Random(19)),
+      _wavyLayer(size, size.height * 0.81, Random(7)),
+      Paint()..color = const Color(0xFF8E5F32),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.91, Random(31)),
       Paint()..color = const Color(0xFF9B6B3A),
     );
 
@@ -908,8 +912,8 @@ class _SoilPainter extends CustomPainter {
     // Zone extends from 0 to solidY + small overlap into solid.
     // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
     // No opacity change — size alone creates the fade effect.
-    final specZoneH = solidY * 1.08;
-    final maxSpecR = size.width / 8;
+    final specZoneH = solidY * 0.9;
+    final maxSpecR = size.width / 7;
     final specPaint = Paint();
     for (final s in _specs) {
       final y = s.ty * specZoneH;
