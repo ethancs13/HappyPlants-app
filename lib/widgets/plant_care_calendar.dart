@@ -260,19 +260,22 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                           }).toList();
 
                           if (isToday) {
-                            return Container(
+                            return SizedBox(
                               width: _colW,
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 1.5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: AppColors.darkOlive, width: 1.5),
-                                borderRadius: BorderRadius.circular(9),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: AppColors.darkOlive, width: 1.5),
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                child: Column(children: cells),
                               ),
-                              child: Column(children: cells),
                             );
                           }
-                          return Column(children: cells);
+                          return SizedBox(
+                            width: _colW,
+                            child: Column(children: cells),
+                          );
                         }),
                       ),
                     ),
