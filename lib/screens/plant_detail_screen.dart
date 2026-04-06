@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -265,10 +266,14 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           Expanded(
             child: SingleChildScrollView(
               controller: _pageScroll,
-              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   _InfoCard(plant: _plant),
                   const SizedBox(height: 20),
                   _ActionButtons(
@@ -423,6 +428,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       children:
                           _logs.map((log) => _CareLogTile(log: log)).toList(),
                     ),
+                      ],
+                    ),
+                  ),
+                  const _SoilSection(),
                 ],
               ),
             ),
@@ -788,4 +797,115 @@ class _CareLogTile extends StatelessWidget {
 
   String _formatDate(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+// ── Soil section ──────────────────────────────────────────────────────────────
+
+class _SoilSection extends StatelessWidget {
+  const _SoilSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 320,
+      width: double.infinity,
+      child: CustomPaint(painter: _SoilPainter()),
+    );
+  }
+}
+
+class _SoilPainter extends CustomPainter {
+  static final _rng = Random(7);
+
+  static final _rocks = List.generate(28, (_) => (
+    dx: _rng.nextDouble(),
+    dy: _rng.nextDouble(),
+    w: 8.0 + _rng.nextDouble() * 22,
+    h: 5.0 + _rng.nextDouble() * 14,
+    dark: _rng.nextBool(),
+  ));
+
+  static final _dots = List.generate(60, (_) => (
+    dx: _rng.nextDouble(),
+    dy: _rng.nextDouble(),
+    r: 1.0 + _rng.nextDouble() * 2,
+  ));
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color(0xFF5C3517),
+    );
+
+    final topEdge = Path()..moveTo(0, 0);
+    final rng2 = Random(13);
+    double x = 0;
+    while (x < size.width) {
+      final cp1x = x + 15;
+      final cp1y = rng2.nextDouble() * 18;
+      final cp2x = x + 30;
+      final cp2y = rng2.nextDouble() * 18;
+      final ex = (x + 40).clamp(0, size.width).toDouble();
+      final ey = rng2.nextDouble() * 14;
+      topEdge.cubicTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
+      x += 40;
+    }
+    topEdge.lineTo(size.width, 0);
+    topEdge.close();
+    canvas.drawPath(topEdge, Paint()..color = const Color(0xFF3B2009));
+
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.38, Random(3)),
+      Paint()..color = const Color(0xFF7A4F28),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.68, Random(19)),
+      Paint()..color = const Color(0xFF9B6B3A),
+    );
+
+    for (final r in _rocks) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(r.dx * size.width, r.dy * size.height),
+          width: r.w,
+          height: r.h,
+        ),
+        Paint()
+          ..color =
+              r.dark ? const Color(0xFF8A7060) : const Color(0xFFB09878),
+      );
+    }
+
+    final dotPaint = Paint()..color = const Color(0x33200E00);
+    for (final d in _dots) {
+      canvas.drawCircle(
+        Offset(d.dx * size.width, d.dy * size.height),
+        d.r,
+        dotPaint,
+      );
+    }
+  }
+
+  Path _wavyLayer(Size size, double topY, Random rng) {
+    final path = Path()..moveTo(0, topY);
+    double x = 0;
+    while (x < size.width) {
+      final ex = (x + 40).clamp(0, size.width).toDouble();
+      path.quadraticBezierTo(
+        x + 20,
+        topY + rng.nextDouble() * 20 - 10,
+        ex,
+        topY + rng.nextDouble() * 12 - 6,
+      );
+      x += 40;
+    }
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
