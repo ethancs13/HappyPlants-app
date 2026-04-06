@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:happy_plants/models/plant.dart';
 import 'package:happy_plants/theme/app_theme.dart';
@@ -6,8 +7,14 @@ import 'package:happy_plants/widgets/plant_widget.dart';
 class PlantCard extends StatelessWidget {
   final Plant plant;
   final VoidCallback onTap;
+  final String? coverPhotoPath;
 
-  const PlantCard({super.key, required this.plant, required this.onTap});
+  const PlantCard({
+    super.key,
+    required this.plant,
+    required this.onTap,
+    this.coverPhotoPath,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,19 +50,29 @@ class PlantCard extends StatelessWidget {
         clipBehavior: Clip.hardEdge,
         child: Row(
           children: [
-            // Plant illustration slot
-            Container(
-              width: 92,
-              height: double.infinity,
-              color: AppColors.potRim,
-              child: Center(
-                child: PlantWidget(
-                  isHappy: !overdue,
-                  size: 72,
-                  plantKey: plant.plantKey,
+            // Plant illustration / cover photo slot
+            if (coverPhotoPath != null && File(coverPhotoPath!).existsSync())
+              SizedBox(
+                width: 92,
+                height: double.infinity,
+                child: Image.file(
+                  File(coverPhotoPath!),
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                width: 92,
+                height: double.infinity,
+                color: AppColors.potRim,
+                child: Center(
+                  child: PlantWidget(
+                    isHappy: !overdue,
+                    size: 72,
+                    plantKey: plant.plantKey,
+                  ),
                 ),
               ),
-            ),
             // Info section
             Expanded(
               child: Padding(
