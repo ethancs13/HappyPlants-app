@@ -71,24 +71,27 @@ class PlantCareCalendar extends StatefulWidget {
 }
 
 class _PlantCareCalendarState extends State<PlantCareCalendar> {
-  static const _pastDays = 14;
-  static const _futureDays = 21;
-  static const _totalDays = _pastDays + 1 + _futureDays;
   static const _colW = 46.0;
   static const _rowH = 52.0;
   static const _headerH = 40.0;
   static const _labelW = 46.0;
+  static const _loadChunk = 14; // days added per edge-load
 
   final _scroll = ScrollController();
   late final DateTime _today;
-  late final DateTime _start;
+  late DateTime _start;
+  int _pastDays = 14;
+  int _futureDays = 21;
+
+  int get _totalDays => _pastDays + 1 + _futureDays;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _today = DateTime(now.year, now.month, now.day);
-    _start = _today.subtract(const Duration(days: _pastDays));
+    _start = _today.subtract(Duration(days: _pastDays));
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToToday());
   }
 
@@ -99,8 +102,34 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    // Near left edge — prepend past days
+    if (pos.pixels < _colW * 3) {
+      setState(() {
+        _pastDays += _loadChunk;
+        _start = _today.subtract(Duration(days: _pastDays));
+      });
+      // Keep scroll position stable after prepending columns
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(
+            (_scroll.offset + _loadChunk * _colW)
+                .clamp(0.0, _scroll.position.maxScrollExtent),
+          );
+        }
+      });
+    }
+    // Near right edge — append future days
+    if (pos.pixels > pos.maxScrollExtent - _colW * 3) {
+      setState(() => _futureDays += _loadChunk);
+    }
+  }
+
   @override
   void dispose() {
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
   }
@@ -123,7 +152,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     final interval = widget.plant.wateringIntervalDays;
     var d = DateTime(last.year, last.month, last.day)
         .add(Duration(days: interval));
-    final limit = _today.add(const Duration(days: _futureDays + 1));
+    final limit = _today.add(Duration(days: _futureDays + 1));
     while (!d.isAfter(limit)) {
       result.add(_dk(d));
       d = d.add(Duration(days: interval));
