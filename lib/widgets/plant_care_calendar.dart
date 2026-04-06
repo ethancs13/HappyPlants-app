@@ -134,6 +134,15 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     super.dispose();
   }
 
+  // "yyyy-MM-dd" → true if a photo was taken that day
+  Set<String> get _photoDateSet {
+    final s = <String>{};
+    for (final p in widget.photos) {
+      s.add(_dk(p.dateTaken));
+    }
+    return s;
+  }
+
   // "yyyy-MM-dd|slotName" → logs in that cell
   Map<String, List<CareLog>> get _logMap {
     final m = <String, List<CareLog>>{};
@@ -169,6 +178,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
   Widget build(BuildContext context) {
     final logMap = _logMap;
     final scheduled = _scheduled;
+    final photoDateSet = _photoDateSet;
 
     return SizedBox(
       height: _headerH + _Slot.values.length * _rowH,
@@ -215,6 +225,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                           return _DayHeader(
                             day: day,
                             isToday: day == _today,
+                            hasPhoto: photoDateSet.contains(_dk(day)),
                             width: _colW,
                           );
                         }),
@@ -305,10 +316,15 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 class _DayHeader extends StatelessWidget {
   final DateTime day;
   final bool isToday;
+  final bool hasPhoto;
   final double width;
 
-  const _DayHeader(
-      {required this.day, required this.isToday, required this.width});
+  const _DayHeader({
+    required this.day,
+    required this.isToday,
+    required this.hasPhoto,
+    required this.width,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -328,23 +344,41 @@ class _DayHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
-          Container(
-            width: 22,
-            height: 22,
-            decoration: isToday
-                ? const BoxDecoration(
-                    color: AppColors.darkOlive, shape: BoxShape.circle)
-                : null,
-            child: Center(
-              child: Text(
-                '${day.day}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isToday ? Colors.white : AppColors.textPrimary,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: isToday
+                    ? const BoxDecoration(
+                        color: AppColors.darkOlive, shape: BoxShape.circle)
+                    : null,
+                child: Center(
+                  child: Text(
+                    '${day.day}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isToday ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (hasPhoto)
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: _waterColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
