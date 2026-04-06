@@ -47,6 +47,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>HappyPlants uses your photos to identify plant species and diagnose ailments.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>HappyPlants uses your camera to photograph your plants for identification and diagnosis.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
