@@ -11,6 +11,7 @@ import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/screens/add_plant_screen.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:happy_plants/widgets/plant_care_calendar.dart';
 import 'package:happy_plants/widgets/plant_widget.dart';
 
 class PlantDetailScreen extends StatefulWidget {
@@ -24,8 +25,8 @@ class PlantDetailScreen extends StatefulWidget {
 
 class _PlantDetailScreenState extends State<PlantDetailScreen> {
   late Plant _plant;
-  late Future<List<CareLog>> _logsFuture;
-  late Future<List<PlantPhoto>> _photosFuture;
+  List<CareLog> _logs = [];
+  List<PlantPhoto> _photos = [];
   bool _actionPending = false;
   final _picker = ImagePicker();
 
@@ -37,14 +38,16 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     _refreshPhotos();
   }
 
-  void _refreshLogs() {
-    _logsFuture = CareLogRepository.create()
-        .then((repo) => repo.getByPlantId(_plant.id!));
+  Future<void> _refreshLogs() async {
+    final repo = await CareLogRepository.create();
+    final logs = await repo.getByPlantId(_plant.id!);
+    if (mounted) setState(() => _logs = logs);
   }
 
-  void _refreshPhotos() {
-    _photosFuture = PlantPhotoRepository.create()
-        .then((repo) => repo.getByPlantId(_plant.id!));
+  Future<void> _refreshPhotos() async {
+    final repo = await PlantPhotoRepository.create();
+    final photos = await repo.getByPlantId(_plant.id!);
+    if (mounted) setState(() => _photos = photos);
   }
 
   Future<void> _logCare(CareType type) async {
@@ -285,18 +288,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  FutureBuilder<List<PlantPhoto>>(
-                    future: _photosFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 110,
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      final photos = snapshot.data ?? [];
-                      if (photos.isEmpty) {
-                        return GestureDetector(
+                  _photos.isEmpty
+                      ? GestureDetector(
                           onTap: _showAddPhotoSheet,
                           child: Container(
                             height: 90,
@@ -311,131 +304,116 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Icons.add_a_photo_outlined,
-                                    color: AppColors.textMuted,
-                                    size: 28,
-                                  ),
+                                  const Icon(Icons.add_a_photo_outlined,
+                                      color: AppColors.textMuted, size: 28),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    'Tap to add your first photo',
-                                    style: Theme.of(context).textTheme.bodyMedium,
-                                  ),
+                                  Text('Tap to add your first photo',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium),
                                 ],
                               ),
                             ),
                           ),
-                        );
-                      }
-                      return SizedBox(
-                        height: 110,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: photos.length + 1,
-                          separatorBuilder: (_, _) => const SizedBox(width: 8),
-                          itemBuilder: (context, i) {
-                            if (i == photos.length) {
-                              // Add button at end
-                              return GestureDetector(
-                                onTap: _showAddPhotoSheet,
-                                child: Container(
-                                  width: 90,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cardBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: AppColors.textMuted
-                                          .withValues(alpha: 0.2),
+                        )
+                      : SizedBox(
+                          height: 110,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _photos.length + 1,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, i) {
+                              if (i == _photos.length) {
+                                return GestureDetector(
+                                  onTap: _showAddPhotoSheet,
+                                  child: Container(
+                                    width: 90,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.cardBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppColors.textMuted
+                                            .withValues(alpha: 0.2),
+                                      ),
                                     ),
+                                    child: const Icon(Icons.add,
+                                        color: AppColors.textMuted, size: 28),
                                   ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: AppColors.textMuted,
-                                    size: 28,
-                                  ),
-                                ),
-                              );
-                            }
-                            final photo = photos[i];
-                            return GestureDetector(
-                              onTap: () => _openPhoto(photo),
-                              onLongPress: () =>
-                                  _showPhotoOptions(photo, photos),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Image.file(
-                                      File(photo.filePath),
-                                      width: 90,
-                                      height: 110,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
+                                );
+                              }
+                              final photo = _photos[i];
+                              return GestureDetector(
+                                onTap: () => _openPhoto(photo),
+                                onLongPress: () =>
+                                    _showPhotoOptions(photo, _photos),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(
+                                        File(photo.filePath),
                                         width: 90,
                                         height: 110,
-                                        color: AppColors.cardBg,
-                                        child: const Icon(
-                                          Icons.broken_image_outlined,
-                                          color: AppColors.textMuted,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          width: 90,
+                                          height: 110,
+                                          color: AppColors.cardBg,
+                                          child: const Icon(
+                                              Icons.broken_image_outlined,
+                                              color: AppColors.textMuted),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  if (photo.isCover)
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.darkOlive,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.star,
-                                          color: Colors.white,
-                                          size: 12,
+                                    if (photo.isCover)
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                              color: AppColors.darkOlive,
+                                              shape: BoxShape.circle),
+                                          child: const Icon(Icons.star,
+                                              color: Colors.white, size: 12),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      );
+                  const SizedBox(height: 24),
+                  Text('Care Schedule',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  PlantCareCalendar(
+                    plant: _plant,
+                    logs: _logs,
+                    photos: _photos,
+                    onRefresh: () {
+                      _refreshLogs();
+                      _refreshPhotos();
                     },
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Care History',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Care History',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-                  FutureBuilder<List<CareLog>>(
-                    future: _logsFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final logs = snapshot.data ?? [];
-                      if (logs.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Text(
-                            'No care logged yet',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return Column(
-                        children: logs
-                            .map((log) => _CareLogTile(log: log))
-                            .toList(),
-                      );
-                    },
-                  ),
+                  if (_logs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text('No care logged yet',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center),
+                    )
+                  else
+                    Column(
+                      children:
+                          _logs.map((log) => _CareLogTile(log: log)).toList(),
+                    ),
                 ],
               ),
             ),
@@ -456,70 +434,61 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   }
 
   Widget _buildHeader(BuildContext context, bool overdue) {
-    return FutureBuilder<List<PlantPhoto>>(
-      future: _photosFuture,
-      builder: (context, snapshot) {
-        final photos = snapshot.data ?? [];
-        final cover = photos.where((p) => p.isCover).firstOrNull;
+    final cover = _photos.where((p) => p.isCover).firstOrNull;
 
-        if (cover != null && File(cover.filePath).existsSync()) {
-          return _CoverPhotoHeader(
-            plant: _plant,
-            coverPhoto: cover,
-            onBack: () => Navigator.pop(context, false),
-            onEdit: _editPlant,
-            onDelete: _deletePlant,
-          );
-        }
+    if (cover != null && File(cover.filePath).existsSync()) {
+      return _CoverPhotoHeader(
+        plant: _plant,
+        coverPhoto: cover,
+        onBack: () => Navigator.pop(context, false),
+        onEdit: _editPlant,
+        onDelete: _deletePlant,
+      );
+    }
 
-        return Container(
-          color: AppColors.brown,
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 8,
-            right: 8,
-            bottom: 0,
-          ),
-          child: Column(
+    return Container(
+      color: AppColors.brown,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 8,
+        right: 8,
+        bottom: 0,
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon:
-                        const Icon(Icons.arrow_back, color: AppColors.tan),
-                    onPressed: () => Navigator.pop(context, false),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _plant.name,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined,
-                        color: AppColors.tan),
-                    onPressed: _editPlant,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.tan),
-                    onPressed: _deletePlant,
-                  ),
-                ],
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.tan),
+                onPressed: () => Navigator.pop(context, false),
               ),
-              const SizedBox(height: 8),
-              PlantWidget(
-                isHappy: !overdue,
-                size: 150,
-                plantKey: _plant.plantKey,
+              Expanded(
+                child: Text(
+                  _plant.name,
+                  style: Theme.of(context).textTheme.headlineLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 16),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: AppColors.tan),
+                onPressed: _editPlant,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppColors.tan),
+                onPressed: _deletePlant,
+              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          PlantWidget(
+            isHappy: !overdue,
+            size: 150,
+            plantKey: _plant.plantKey,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }
