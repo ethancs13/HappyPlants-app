@@ -815,59 +815,65 @@ class _SoilSection extends StatelessWidget {
 }
 
 class _SoilPainter extends CustomPainter {
-  static final _rng = Random(7);
+  // Fixed seeds → deterministic layout, no allocations on repaint
+  static final _specRng = Random(42);
+  static final _rockRng = Random(7);
 
-  static final _rocks = List.generate(28, (_) => (
-    dx: _rng.nextDouble(),
-    dy: _rng.nextDouble(),
-    w: 8.0 + _rng.nextDouble() * 22,
-    h: 5.0 + _rng.nextDouble() * 14,
-    dark: _rng.nextBool(),
+  // Transition specs: cover the full height; density driven by sqrt(t) bias
+  static final _specs = List.generate(350, (_) {
+    final t = _specRng.nextDouble();
+    return (
+      tx: _specRng.nextDouble(), // x as fraction of width
+      ty: sqrt(t),              // bias toward bottom of transition zone
+      r: 0.8 + _specRng.nextDouble() * 2.8,
+      opacity: 0.25 + _specRng.nextDouble() * 0.65,
+    );
+  });
+
+  // Rocks — only in the solid portion (ty > 0.42)
+  static final _rocks = List.generate(26, (_) => (
+    tx: _rockRng.nextDouble(),
+    ty: 0.42 + _rockRng.nextDouble() * 0.58,
+    w: 7.0 + _rockRng.nextDouble() * 22,
+    h: 5.0 + _rockRng.nextDouble() * 13,
+    dark: _rockRng.nextBool(),
   ));
 
-  static final _dots = List.generate(60, (_) => (
-    dx: _rng.nextDouble(),
-    dy: _rng.nextDouble(),
-    r: 1.0 + _rng.nextDouble() * 2,
+  // Fine texture dots — only in solid portion
+  static final _dots = List.generate(70, (_) => (
+    tx: _rockRng.nextDouble(),
+    ty: 0.40 + _rockRng.nextDouble() * 0.60,
+    r: 0.8 + _rockRng.nextDouble() * 1.8,
   ));
+
+  // The solid soil begins at this fraction of total height
+  static const _solidStart = 0.38;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final solidY = size.height * _solidStart;
+
+    // ── Solid soil background (from solidStart down) ───────────────────
     canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
+      Rect.fromLTWH(0, solidY, size.width, size.height - solidY),
       Paint()..color = const Color(0xFF5C3517),
     );
 
-    final topEdge = Path()..moveTo(0, 0);
-    final rng2 = Random(13);
-    double x = 0;
-    while (x < size.width) {
-      final cp1x = x + 15;
-      final cp1y = rng2.nextDouble() * 18;
-      final cp2x = x + 30;
-      final cp2y = rng2.nextDouble() * 18;
-      final ex = (x + 40).clamp(0, size.width).toDouble();
-      final ey = rng2.nextDouble() * 14;
-      topEdge.cubicTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
-      x += 40;
-    }
-    topEdge.lineTo(size.width, 0);
-    topEdge.close();
-    canvas.drawPath(topEdge, Paint()..color = const Color(0xFF3B2009));
-
+    // ── Sub-layers ─────────────────────────────────────────────────────
     canvas.drawPath(
-      _wavyLayer(size, size.height * 0.38, Random(3)),
+      _wavyLayer(size, size.height * 0.55, Random(3)),
       Paint()..color = const Color(0xFF7A4F28),
     );
     canvas.drawPath(
-      _wavyLayer(size, size.height * 0.68, Random(19)),
+      _wavyLayer(size, size.height * 0.76, Random(19)),
       Paint()..color = const Color(0xFF9B6B3A),
     );
 
+    // ── Rocks ─────────────────────────────────────────────────────────
     for (final r in _rocks) {
       canvas.drawOval(
         Rect.fromCenter(
-          center: Offset(r.dx * size.width, r.dy * size.height),
+          center: Offset(r.tx * size.width, r.ty * size.height),
           width: r.w,
           height: r.h,
         ),
@@ -877,12 +883,28 @@ class _SoilPainter extends CustomPainter {
       );
     }
 
-    final dotPaint = Paint()..color = const Color(0x33200E00);
+    // ── Fine texture dots ──────────────────────────────────────────────
+    final dotPaint = Paint()..color = const Color(0x44200E00);
     for (final d in _dots) {
       canvas.drawCircle(
-        Offset(d.dx * size.width, d.dy * size.height),
+        Offset(d.tx * size.width, d.ty * size.height),
         d.r,
         dotPaint,
+      );
+    }
+
+    // ── Transition specs (drawn last so they appear on top of cream bg) ─
+    // Each spec's ty is in 0..1 mapped to 0..solidY + a little overlap.
+    // Opacity increases with depth so top specs are nearly invisible.
+    final specZoneH = solidY * 1.15; // extend slightly into solid for blend
+    for (final s in _specs) {
+      final y = s.ty * specZoneH;
+      final depthT = (y / specZoneH).clamp(0.0, 1.0);
+      final opacity = s.opacity * depthT * depthT; // quadratic fade-in
+      canvas.drawCircle(
+        Offset(s.tx * size.width, y),
+        s.r,
+        Paint()..color = Color.fromRGBO(92, 53, 23, opacity),
       );
     }
   }
@@ -891,12 +913,12 @@ class _SoilPainter extends CustomPainter {
     final path = Path()..moveTo(0, topY);
     double x = 0;
     while (x < size.width) {
-      final ex = (x + 40).clamp(0, size.width).toDouble();
+      final ex = (x + 40).clamp(0.0, size.width);
       path.quadraticBezierTo(
         x + 20,
-        topY + rng.nextDouble() * 20 - 10,
+        topY + rng.nextDouble() * 22 - 11,
         ex,
-        topY + rng.nextDouble() * 12 - 6,
+        topY + rng.nextDouble() * 14 - 7,
       );
       x += 40;
     }
