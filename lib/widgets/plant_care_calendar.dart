@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:happy_plants/models/care_log.dart';
 import 'package:happy_plants/models/plant.dart';
+import 'package:happy_plants/models/plant_photo.dart';
 import 'package:happy_plants/repositories/care_log_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/theme/app_theme.dart';
@@ -54,12 +55,14 @@ const _pickerEmojis = ['💧', '🌱', '✂️', '🌞', '🌿', '🪴', '🐛',
 class PlantCareCalendar extends StatefulWidget {
   final Plant plant;
   final List<CareLog> logs;
+  final List<PlantPhoto> photos;
   final VoidCallback onRefresh;
 
   const PlantCareCalendar({
     super.key,
     required this.plant,
     required this.logs,
+    required this.photos,
     required this.onRefresh,
   });
 
