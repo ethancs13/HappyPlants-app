@@ -821,12 +821,23 @@ class _SoilPainter extends CustomPainter {
   // Transition specs spread across 0..1 (mapped to 0..transitionZone in paint).
   // ty uses sqrt bias so more specs cluster near the bottom of the zone.
   // Size (not opacity) encodes depth: tiny at top, larger at bottom.
+  static const _specColors = [
+    Color(0xFF5C3517), // dark brown
+    Color(0xFF7A4F28), // medium brown
+    Color(0xFF3B2009), // near-black earth
+    Color(0xFF9B6B3A), // warm tan
+    Color(0xFF8B4513), // saddle brown
+    Color(0xFF6B3A1F), // red-clay
+    Color(0xFFB08B5A), // sandy
+  ];
+
   static final _specs = List.generate(500, (_) {
     final t = _specRng.nextDouble();
     return (
       tx: _specRng.nextDouble(),
-      ty: sqrt(t), // sqrt bias → denser toward solid
-      baseR: _specRng.nextDouble(), // 0..1, scaled in paint by depth
+      ty: sqrt(t),
+      baseR: _specRng.nextDouble(),
+      ci: _specRng.nextInt(_specColors.length),
     );
   });
 
@@ -899,12 +910,13 @@ class _SoilPainter extends CustomPainter {
     // No opacity change — size alone creates the fade effect.
     final specZoneH = solidY * 1.08;
     final maxSpecR = size.width / 8;
-    final specPaint = Paint()..color = const Color(0xFF5C3517);
+    final specPaint = Paint();
     for (final s in _specs) {
       final y = s.ty * specZoneH;
       final depthT = (y / specZoneH).clamp(0.0, 1.0);
       final r = (0.4 + s.baseR * (maxSpecR - 0.4)) * depthT * depthT;
       if (r < 0.3) continue;
+      specPaint.color = _specColors[s.ci];
       canvas.drawCircle(Offset(s.tx * size.width, y), r, specPaint);
     }
   }
