@@ -129,6 +129,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 
   @override
   void dispose() {
+    _dismissRadialMenu();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
@@ -256,9 +257,10 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                                 onTap: isFuture && !isScheduled
                                     ? null
                                     : () => _onTap(day, slot, cellLogs),
-                                onLongPress: isFuture
+                                onLongPressStart: isFuture
                                     ? null
-                                    : () => _onLongPress(day, slot, cellLogs),
+                                    : (pos) => _onLongPress(
+                                        day, slot, cellLogs, pos),
                               );
                             }),
                           ),
@@ -290,7 +292,38 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     if (refresh == true && mounted) widget.onRefresh();
   }
 
-  Future<void> _onLongPress(
+  OverlayEntry? _radialMenu;
+
+  void _onLongPress(
+      DateTime day, _Slot slot, List<CareLog> existing, Offset globalPos) {
+    _dismissRadialMenu();
+    final entry = OverlayEntry(
+      builder: (_) => _RadialMenu(
+        anchor: globalPos,
+        hasLogs: existing.isNotEmpty,
+        onDismiss: _dismissRadialMenu,
+        onEdit: () {
+          _dismissRadialMenu();
+          _openCustomLog(day, slot, existing);
+        },
+        onDelete: existing.isNotEmpty
+            ? () {
+                _dismissRadialMenu();
+                _deleteAll(existing);
+              }
+            : null,
+      ),
+    );
+    _radialMenu = entry;
+    Overlay.of(context).insert(entry);
+  }
+
+  void _dismissRadialMenu() {
+    _radialMenu?.remove();
+    _radialMenu = null;
+  }
+
+  Future<void> _openCustomLog(
       DateTime day, _Slot slot, List<CareLog> existing) async {
     final refresh = await showDialog<bool>(
       context: context,
@@ -305,6 +338,14 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
       ),
     );
     if (refresh == true && mounted) widget.onRefresh();
+  }
+
+  Future<void> _deleteAll(List<CareLog> logs) async {
+    final repo = await CareLogRepository.create();
+    for (final log in logs) {
+      await repo.delete(log.id!);
+    }
+    if (mounted) widget.onRefresh();
   }
 }
 
@@ -384,7 +425,7 @@ class _CalendarCell extends StatelessWidget {
   final bool isToday;
   final bool isFuture;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
+  final void Function(Offset globalPosition)? onLongPressStart;
 
   const _CalendarCell({
     required this.width,
@@ -394,7 +435,7 @@ class _CalendarCell extends StatelessWidget {
     required this.isToday,
     required this.isFuture,
     required this.onTap,
-    required this.onLongPress,
+    required this.onLongPressStart,
   });
 
   static Color _parseHex(String hex) {
@@ -430,7 +471,9 @@ class _CalendarCell extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onLongPress,
+      onLongPressStart: onLongPressStart == null
+          ? null
+          : (d) => onLongPressStart!(d.globalPosition),
       child: Container(
         width: width,
         height: height,
@@ -444,7 +487,7 @@ class _CalendarCell extends StatelessWidget {
             ? _logContent(last!)
             : isScheduled
                 ? const Center(
-                    child: Icon(Icons.water_drop_outlined,
+                    child: Icon(Icons.water_drop,
                         size: 14, color: AppColors.statusGreen),
                   )
                 : null,
@@ -836,6 +879,132 @@ class _CustomLogSheetState extends State<_CustomLogSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Radial context menu ───────────────────────────────────────────────────────
+
+class _RadialMenu extends StatefulWidget {
+  final Offset anchor;
+  final bool hasLogs;
+  final VoidCallback onDismiss;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+
+  const _RadialMenu({
+    required this.anchor,
+    required this.hasLogs,
+    required this.onDismiss,
+    required this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  State<_RadialMenu> createState() => _RadialMenuState();
+}
+
+class _RadialMenuState extends State<_RadialMenu>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 180));
+    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget _bubble({
+    required Offset offset,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required String label,
+  }) {
+    return Positioned(
+      left: offset.dx - 22,
+      top: offset.dy - 22,
+      child: ScaleTransition(
+        scale: _scale,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 8)
+                  ],
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.anchor;
+    return GestureDetector(
+      onTap: widget.onDismiss,
+      behavior: HitTestBehavior.translucent,
+      child: SizedBox.expand(
+        child: Stack(
+          children: [
+            // 12 o'clock — Edit / Add
+            _bubble(
+              offset: Offset(a.dx, a.dy - 68),
+              icon: Icons.edit_outlined,
+              color: AppColors.darkOlive,
+              onTap: widget.onEdit,
+              label: 'Edit',
+            ),
+            // 2-3 o'clock — Delete (only if logs exist)
+            if (widget.onDelete != null)
+              _bubble(
+                offset: Offset(a.dx + 52, a.dy - 42),
+                icon: Icons.delete_outline,
+                color: AppColors.statusRed,
+                onTap: widget.onDelete!,
+                label: 'Delete',
+              ),
+          ],
         ),
       ),
     );
