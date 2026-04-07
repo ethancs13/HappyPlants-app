@@ -4,6 +4,7 @@ import 'package:happy_plants/models/plant.dart';
 import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/routes/circular_reveal_route.dart';
+import 'package:happy_plants/screens/calendar_screen.dart';
 import 'package:happy_plants/screens/chat_screen.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:happy_plants/widgets/plant_card.dart';
@@ -16,9 +17,70 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+class _HomeScreenState extends State<HomeScreen> {
+  int _tab = 0;
+  final _plantsTabKey = GlobalKey<_PlantsTabState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      floatingActionButton: _tab == 0
+          ? FloatingActionButton(
+              onPressed: _openAddPlant,
+              backgroundColor: AppColors.darkOlive,
+              foregroundColor: AppColors.tan,
+              elevation: 3,
+              child: const Icon(Icons.add, size: 28),
+            )
+          : null,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tab,
+        onTap: (i) => setState(() => _tab = i),
+        backgroundColor: AppColors.darkOlive,
+        selectedItemColor: AppColors.tan,
+        unselectedItemColor: AppColors.tan.withValues(alpha: 0.45),
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_florist),
+            label: 'Plants',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'Calendar',
+          ),
+        ],
+      ),
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          _PlantsTab(key: _plantsTabKey),
+          const CalendarScreen(),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAddPlant() async {
+    final added = await Navigator.pushNamed(context, '/add');
+    if (added == true) _plantsTabKey.currentState?._refresh();
+  }
+}
+
+// ── Plants Tab ────────────────────────────────────────────────────────────────
+
+class _PlantsTab extends StatefulWidget {
+  const _PlantsTab({super.key});
+
+  @override
+  State<_PlantsTab> createState() => _PlantsTabState();
+}
+
 typedef _HomeData = ({List<Plant> plants, Map<int, String> coverPhotos});
 
-class _HomeScreenState extends State<HomeScreen> {
+class _PlantsTabState extends State<_PlantsTab> {
   late Future<_HomeData> _dataFuture;
   final _chatBubbleKey = GlobalKey();
 
@@ -55,67 +117,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddPlant,
-        backgroundColor: AppColors.darkOlive,
-        foregroundColor: AppColors.tan,
-        elevation: 3,
-        child: const Icon(Icons.add, size: 28),
-      ),
-      body: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _Header(),
-              Expanded(
-                child: FutureBuilder<_HomeData>(
-                  future: _dataFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final plants = snapshot.data?.plants ?? [];
-                    final coverPhotos = snapshot.data?.coverPhotos ?? {};
-                    if (plants.isEmpty) return const _EmptyState();
-                    return _PlantList(
-                      plants: plants,
-                      coverPhotos: coverPhotos,
-                      onPlantTap: _openDetail,
-                      onRefresh: () async => setState(_load),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          Positioned(
-            bottom: MediaQuery.of(context).viewPadding.bottom - 8,
-            left: -8,
-            child: _AIChatBubble(
-              key: _chatBubbleKey,
-              onTap: _openChat,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openAddPlant() async {
-    final added = await Navigator.pushNamed(context, '/add');
-    if (added == true) _refresh();
-  }
-
   Future<void> _openDetail(Plant plant) async {
     await Navigator.pushNamed(context, '/detail', arguments: plant);
     _refresh();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _Header(),
+            Expanded(
+              child: FutureBuilder<_HomeData>(
+                future: _dataFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final plants = snapshot.data?.plants ?? [];
+                  final coverPhotos = snapshot.data?.coverPhotos ?? {};
+                  if (plants.isEmpty) return const _EmptyState();
+                  return _PlantList(
+                    plants: plants,
+                    coverPhotos: coverPhotos,
+                    onPlantTap: _openDetail,
+                    onRefresh: () async => setState(_load),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          bottom: MediaQuery.of(context).viewPadding.bottom - 8,
+          left: -8,
+          child: _AIChatBubble(
+            key: _chatBubbleKey,
+            onTap: _openChat,
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+// ── Header ────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
   const _Header();
@@ -137,6 +186,8 @@ class _Header extends StatelessWidget {
     );
   }
 }
+
+// ── Empty State ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -220,7 +271,9 @@ class _AIChatBubbleState extends State<_AIChatBubble>
 
   @override
   void dispose() {
-    for (final c in _rings) { c.dispose(); }
+    for (final c in _rings) {
+      c.dispose();
+    }
     _wavePhase.dispose();
     _breathe.dispose();
     super.dispose();
