@@ -27,6 +27,14 @@ class CareLogRepository {
     return rows.map(CareLog.fromMap).toList();
   }
 
+  Future<List<CareLog>> getAll() async {
+    final rows = await _db.query('care_logs', orderBy: 'date ASC');
+    return rows.map(CareLog.fromMap).toList();
+  }
+
+  Future<void> update(CareLog log) =>
+      _db.update('care_logs', log.toMap(), where: 'id = ?', whereArgs: [log.id]);
+
   Future<void> delete(int id) =>
       _db.delete('care_logs', where: 'id = ?', whereArgs: [id]);
 
