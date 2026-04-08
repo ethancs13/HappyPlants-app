@@ -18,6 +18,12 @@ class PlantPhotoRepository {
     return photo.copyWith(id: id);
   }
 
+  Future<List<PlantPhoto>> getAll() async {
+    final db = await _db.database;
+    final rows = await db.query('plant_photos', orderBy: 'date_taken ASC');
+    return rows.map(PlantPhoto.fromMap).toList();
+  }
+
   Future<List<PlantPhoto>> getByPlantId(int plantId) async {
     final db = await _db.database;
     final rows = await db.query(
