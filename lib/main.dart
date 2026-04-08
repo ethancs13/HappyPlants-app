@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:happy_plants/models/plant.dart';
+import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/screens/add_plant_screen.dart';
 import 'package:happy_plants/screens/home_screen.dart';
 import 'package:happy_plants/screens/plant_detail_screen.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+
+  // Reschedule all notifications on every startup so they reflect current DB state
+  final repo = await PlantRepository.create();
+  final plants = await repo.getAll();
+  await NotificationService.rescheduleAll(plants);
+
   runApp(const HappyPlantsApp());
 }
 
