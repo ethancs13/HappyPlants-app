@@ -6,6 +6,7 @@ import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/routes/circular_reveal_route.dart';
 import 'package:happy_plants/screens/calendar_screen.dart';
 import 'package:happy_plants/screens/chat_screen.dart';
+import 'package:happy_plants/screens/settings_screen.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:happy_plants/widgets/plant_card.dart';
 import 'package:happy_plants/widgets/plant_widget.dart';
@@ -183,14 +184,28 @@ class _Header extends StatelessWidget {
     return Container(
       color: AppColors.darkOlive,
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 16,
+        top: MediaQuery.of(context).padding.top + 12,
         left: 20,
-        right: 20,
-        bottom: 20,
+        right: 8,
+        bottom: 16,
       ),
-      child: Text(
-        'My Plants',
-        style: Theme.of(context).textTheme.headlineLarge,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'My Plants',
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.tan),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+            tooltip: 'Settings',
+          ),
+        ],
       ),
     );
   }
