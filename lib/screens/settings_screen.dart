@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,9 +10,60 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // TODO: persist with shared_preferences; wire to NotificationService
-  //       once feature/notifications is merged into main.
+  // TODO: wire to NotificationService once feature/notifications is merged into main.
   bool _notificationsEnabled = true;
+  TimeOfDay _reminderTime = const TimeOfDay(hour: 9, minute: 0);
+
+  static const _notificationsEnabledKey = 'notifications_enabled';
+  static const _reminderHourKey = 'reminder_hour';
+  static const _reminderMinuteKey = 'reminder_minute';
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedEnabled = prefs.getBool(_notificationsEnabledKey);
+    final savedHour = prefs.getInt(_reminderHourKey);
+    final savedMinute = prefs.getInt(_reminderMinuteKey);
+
+    if (!mounted) return;
+
+    setState(() {
+      _notificationsEnabled = savedEnabled ?? true;
+
+      if (savedHour != null && savedMinute != null) {
+        _reminderTime = TimeOfDay(hour: savedHour, minute: savedMinute);
+      }
+    });
+  }
+
+  Future<void> _setNotificationsEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsEnabledKey, value);
+
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = value);
+  }
+
+  Future<void> _pickReminderTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _reminderTime,
+    );
+
+    if (picked == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_reminderHourKey, picked.hour);
+    await prefs.setInt(_reminderMinuteKey, picked.minute);
+
+    if (!mounted) return;
+    setState(() => _reminderTime = picked);
+  }
 
   void _sendTestNotification() {
     // TODO: replace with NotificationService.sendTest() after merge
@@ -42,8 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Notify me when a plant needs water',
                   trailing: Switch(
                     value: _notificationsEnabled,
-                    onChanged: (v) =>
-                        setState(() => _notificationsEnabled = v),
+                    onChanged: _setNotificationsEnabled,
                     activeThumbColor: AppColors.darkOlive,
                     activeTrackColor: AppColors.olive,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -52,9 +103,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _Tile(
                   icon: Icons.schedule_outlined,
                   title: 'Reminder time',
-                  subtitle: '9:00 AM',
-                  // TODO: show time picker, persist choice
-                  onTap: () {},
+                  subtitle: _reminderTime.format(context),
+                  onTap: _pickReminderTime,
                 ),
                 _Tile(
                   icon: Icons.notifications_active_outlined,
@@ -63,7 +113,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _sendTestNotification,
                 ),
                 const SizedBox(height: 8),
-                const Divider(indent: 20, endIndent: 20, color: AppColors.divider),
+                const Divider(
+                  indent: 20,
+                  endIndent: 20,
+                  color: AppColors.divider,
+                ),
                 const SizedBox(height: 8),
                 _SectionLabel('About'),
                 const _Tile(
@@ -96,10 +150,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Text(
             'Settings',
-            style: Theme.of(context)
-                .textTheme
-                .headlineLarge
-                ?.copyWith(fontSize: 22),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineLarge?.copyWith(fontSize: 22),
           ),
         ],
       ),
@@ -174,10 +227,14 @@ class _Tile extends StatelessWidget {
                 ),
               )
             : null,
-        trailing: trailing ??
+        trailing:
+            trailing ??
             (onTap != null
-                ? const Icon(Icons.chevron_right,
-                    color: AppColors.textMuted, size: 18)
+                ? const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                    size: 18,
+                  )
                 : null),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
