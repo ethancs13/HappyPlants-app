@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -79,9 +78,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       if (mounted) {
         setState(() {
           _plant = updated;
-          _refreshLogs();
           _actionPending = false;
         });
+        _refreshLogs();
       }
     } catch (_) {
       if (mounted) setState(() => _actionPending = false);
@@ -116,7 +115,39 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       isCover: isFirst,
     ));
 
-    if (mounted) setState(_refreshPhotos);
+    if (mounted) _refreshPhotos();
+  }
+
+  Future<void> _toggleScheduleOnCalendar(bool value) async {
+    var updated = _plant.copyWith(showScheduleOnCalendar: value);
+    if (value && _plant.lastWateredDate == null) {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: DateTime.now().add(Duration(days: _plant.wateringIntervalDays)),
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+        helpText: 'When should the first watering be?',
+      );
+      if (picked == null || !mounted) return;
+      final anchor = DateTime(picked.year, picked.month, picked.day)
+          .subtract(Duration(days: _plant.wateringIntervalDays));
+      updated = updated.copyWith(lastWateredDate: anchor);
+    }
+    final repo = await PlantRepository.create();
+    await repo.update(updated);
+    if (mounted) setState(() => _plant = updated);
+  }
+
+  Future<void> _rescheduleWatering(DateTime newNextWateringDate) async {
+    final anchor = DateTime(
+      newNextWateringDate.year,
+      newNextWateringDate.month,
+      newNextWateringDate.day,
+    ).subtract(Duration(days: _plant.wateringIntervalDays));
+    final updated = _plant.copyWith(lastWateredDate: anchor);
+    final repo = await PlantRepository.create();
+    await repo.update(updated);
+    if (mounted) setState(() => _plant = updated);
   }
 
   Future<void> _showAddPhotoSheet() async {
@@ -171,7 +202,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                   Navigator.pop(context);
                   final repo = await PlantPhotoRepository.create();
                   await repo.setCover(_plant.id!, photo.id!);
-                  if (mounted) setState(_refreshPhotos);
+                  if (mounted) _refreshPhotos();
                 },
               ),
             ListTile(
@@ -187,7 +218,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                 // Delete file from disk
                 final file = File(photo.filePath);
                 if (await file.exists()) await file.delete();
-                if (mounted) setState(_refreshPhotos);
+                if (mounted) _refreshPhotos();
               },
             ),
           ],
@@ -399,8 +430,25 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           ),
                         ),
                   const SizedBox(height: 24),
-                  Text('Care Schedule',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Care Schedule',
+                            style: Theme.of(context).textTheme.titleMedium),
+                      ),
+                      const Icon(Icons.calendar_month,
+                          size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Switch(
+                        value: _plant.showScheduleOnCalendar,
+                        onChanged: _toggleScheduleOnCalendar,
+                        activeThumbColor: AppColors.darkOlive,
+                        activeTrackColor: AppColors.olive,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   PlantCareCalendar(
                     plant: _plant,
@@ -411,6 +459,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       _refreshLogs();
                       _refreshPhotos();
                     },
+                    onReschedule: _rescheduleWatering,
                   ),
                   const SizedBox(height: 24),
                   Text('Care History',
@@ -431,7 +480,6 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                       ],
                     ),
                   ),
-                  const _SoilSection(),
                 ],
               ),
             ),
@@ -801,149 +849,149 @@ class _CareLogTile extends StatelessWidget {
 
 // ── Soil section ──────────────────────────────────────────────────────────────
 
-class _SoilSection extends StatelessWidget {
-  const _SoilSection();
+// class _SoilSection extends StatelessWidget {
+//   const _SoilSection();
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 600,
-      width: double.infinity,
-      child: CustomPaint(painter: _SoilPainter()),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return SizedBox(
+//       height: 600,
+//       width: double.infinity,
+//       child: CustomPaint(painter: _SoilPainter()),
+//     );
+//   }
+// }
 
-class _SoilPainter extends CustomPainter {
-  static final _specRng = Random(42);
-  static final _rockRng = Random(7);
+// class _SoilPainter extends CustomPainter {
+//   static final _specRng = Random(42);
+//   static final _rockRng = Random(7);
 
-  // Transition specs spread across 0..1 (mapped to 0..transitionZone in paint).
-  // ty uses sqrt bias so more specs cluster near the bottom of the zone.
-  // Size (not opacity) encodes depth: tiny at top, larger at bottom.
-  static const _specColors = [
-    Color(0xFF5C3517), // dark brown
-    Color(0xFF7A4F28), // medium brown
-    Color(0xFF3B2009), // near-black earth
-  ];
+//   // Transition specs spread across 0..1 (mapped to 0..transitionZone in paint).
+//   // ty uses sqrt bias so more specs cluster near the bottom of the zone.
+//   // Size (not opacity) encodes depth: tiny at top, larger at bottom.
+//   static const _specColors = [
+//     Color(0xFF5C3517), // dark brown
+//     Color(0xFF7A4F28), // medium brown
+//     Color(0xFF3B2009), // near-black earth
+//   ];
 
-  static final _specs = List.generate(200, (_) {
-    final t = _specRng.nextDouble();
-    return (
-      tx: _specRng.nextDouble(),
-      ty: sqrt(t),
-      baseR: _specRng.nextDouble(),
-      ci: _specRng.nextInt(_specColors.length),
-    );
-  });
+//   static final _specs = List.generate(200, (_) {
+//     final t = _specRng.nextDouble();
+//     return (
+//       tx: _specRng.nextDouble(),
+//       ty: sqrt(t),
+//       baseR: _specRng.nextDouble(),
+//       ci: _specRng.nextInt(_specColors.length),
+//     );
+//   });
 
-  // Rocks — only in solid portion
-  static final _rocks = List.generate(26, (_) => (
-    tx: _rockRng.nextDouble(),
-    ty: 0.48 + _rockRng.nextDouble() * 0.52,
-    w: 7.0 + _rockRng.nextDouble() * 22,
-    h: 5.0 + _rockRng.nextDouble() * 13,
-    dark: _rockRng.nextBool(),
-  ));
+//   // Rocks — only in solid portion
+//   static final _rocks = List.generate(26, (_) => (
+//     tx: _rockRng.nextDouble(),
+//     ty: 0.48 + _rockRng.nextDouble() * 0.52,
+//     w: 7.0 + _rockRng.nextDouble() * 22,
+//     h: 5.0 + _rockRng.nextDouble() * 13,
+//     dark: _rockRng.nextBool(),
+//   ));
 
-  // Fine texture dots — only in solid portion
-  static final _dots = List.generate(70, (_) => (
-    tx: _rockRng.nextDouble(),
-    ty: 0.48 + _rockRng.nextDouble() * 0.52,
-    r: 0.8 + _rockRng.nextDouble() * 1.8,
-  ));
+//   // Fine texture dots — only in solid portion
+//   static final _dots = List.generate(70, (_) => (
+//     tx: _rockRng.nextDouble(),
+//     ty: 0.48 + _rockRng.nextDouble() * 0.52,
+//     r: 0.8 + _rockRng.nextDouble() * 1.8,
+//   ));
 
-  // Solid soil starts at 48% of the widget height
-  static const _solidStart = 0.34;
+//   // Solid soil starts at 48% of the widget height
+//   static const _solidStart = 0.34;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final solidY = size.height * _solidStart;
+//   @override
+//   void paint(Canvas canvas, Size size) {
+//     final solidY = size.height * _solidStart;
 
-    // ── Solid soil background ──────────────────────────────────────────
-    canvas.drawRect(
-      Rect.fromLTWH(0, solidY, size.width, size.height - solidY),
-      Paint()..color = const Color(0xFF5C3517),
-    );
+//     // ── Solid soil background ──────────────────────────────────────────
+//     canvas.drawRect(
+//       Rect.fromLTWH(0, solidY, size.width, size.height - solidY),
+//       Paint()..color = const Color(0xFF5C3517),
+//     );
 
-    // ── Sub-layers (4 layers, evenly spaced across solid portion) ──────
-    canvas.drawPath(
-      _wavyLayer(size, size.height * 0.60, Random(3)),
-      Paint()..color = const Color(0xFF6B3E1A),
-    );
-    canvas.drawPath(
-      _wavyLayer(size, size.height * 0.70, Random(19)),
-      Paint()..color = const Color(0xFF7A4F28),
-    );
-    canvas.drawPath(
-      _wavyLayer(size, size.height * 0.81, Random(7)),
-      Paint()..color = const Color(0xFF8E5F32),
-    );
-    canvas.drawPath(
-      _wavyLayer(size, size.height * 0.91, Random(31)),
-      Paint()..color = const Color(0xFF9B6B3A),
-    );
+//     // ── Sub-layers (4 layers, evenly spaced across solid portion) ──────
+//     canvas.drawPath(
+//       _wavyLayer(size, size.height * 0.60, Random(3)),
+//       Paint()..color = const Color(0xFF6B3E1A),
+//     );
+//     canvas.drawPath(
+//       _wavyLayer(size, size.height * 0.70, Random(19)),
+//       Paint()..color = const Color(0xFF7A4F28),
+//     );
+//     canvas.drawPath(
+//       _wavyLayer(size, size.height * 0.81, Random(7)),
+//       Paint()..color = const Color(0xFF8E5F32),
+//     );
+//     canvas.drawPath(
+//       _wavyLayer(size, size.height * 0.91, Random(31)),
+//       Paint()..color = const Color(0xFF9B6B3A),
+//     );
 
-    // ── Rocks ─────────────────────────────────────────────────────────
-    for (final r in _rocks) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(r.tx * size.width, r.ty * size.height),
-          width: r.w,
-          height: r.h,
-        ),
-        Paint()
-          ..color =
-              r.dark ? const Color(0xFF8A7060) : const Color(0xFFB09878),
-      );
-    }
+//     // ── Rocks ─────────────────────────────────────────────────────────
+//     for (final r in _rocks) {
+//       canvas.drawOval(
+//         Rect.fromCenter(
+//           center: Offset(r.tx * size.width, r.ty * size.height),
+//           width: r.w,
+//           height: r.h,
+//         ),
+//         Paint()
+//           ..color =
+//               r.dark ? const Color(0xFF8A7060) : const Color(0xFFB09878),
+//       );
+//     }
 
-    // ── Fine texture dots ──────────────────────────────────────────────
-    final dotPaint = Paint()..color = const Color(0x55200E00);
-    for (final d in _dots) {
-      canvas.drawCircle(
-        Offset(d.tx * size.width, d.ty * size.height),
-        d.r,
-        dotPaint,
-      );
-    }
+//     // ── Fine texture dots ──────────────────────────────────────────────
+//     final dotPaint = Paint()..color = const Color(0x55200E00);
+//     for (final d in _dots) {
+//       canvas.drawCircle(
+//         Offset(d.tx * size.width, d.ty * size.height),
+//         d.r,
+//         dotPaint,
+//       );
+//     }
 
-    // ── Transition specs ───────────────────────────────────────────────
-    // Zone extends from 0 to solidY + small overlap into solid.
-    // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
-    // No opacity change — size alone creates the fade effect.
-    final specZoneH = solidY * 1.4;
-    final maxSpecR = size.width / 7;
-    final specPaint = Paint();
-    for (final s in _specs) {
-      final y = s.ty * specZoneH;
-      final depthT = (y / specZoneH).clamp(0.0, 1.0);
-      final r = (0.4 + s.baseR * (maxSpecR - 0.4)) * depthT * depthT;
-      if (r < 0.3) continue;
-      specPaint.color = _specColors[s.ci];
-      canvas.drawCircle(Offset(s.tx * size.width, y), r, specPaint);
-    }
-  }
+//     // ── Transition specs ───────────────────────────────────────────────
+//     // Zone extends from 0 to solidY + small overlap into solid.
+//     // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
+//     // No opacity change — size alone creates the fade effect.
+//     final specZoneH = solidY * 1.4;
+//     final maxSpecR = size.width / 7;
+//     final specPaint = Paint();
+//     for (final s in _specs) {
+//       final y = s.ty * specZoneH;
+//       final depthT = (y / specZoneH).clamp(0.0, 1.0);
+//       final r = (0.4 + s.baseR * (maxSpecR - 0.4)) * depthT * depthT;
+//       if (r < 0.3) continue;
+//       specPaint.color = _specColors[s.ci];
+//       canvas.drawCircle(Offset(s.tx * size.width, y), r, specPaint);
+//     }
+//   }
 
-  Path _wavyLayer(Size size, double topY, Random rng) {
-    final path = Path()..moveTo(0, topY);
-    double x = 0;
-    while (x < size.width) {
-      final ex = (x + 40).clamp(0.0, size.width);
-      path.quadraticBezierTo(
-        x + 20,
-        topY + rng.nextDouble() * 22 - 11,
-        ex,
-        topY + rng.nextDouble() * 14 - 7,
-      );
-      x += 40;
-    }
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    return path;
-  }
+//   Path _wavyLayer(Size size, double topY, Random rng) {
+//     final path = Path()..moveTo(0, topY);
+//     double x = 0;
+//     while (x < size.width) {
+//       final ex = (x + 40).clamp(0.0, size.width);
+//       path.quadraticBezierTo(
+//         x + 20,
+//         topY + rng.nextDouble() * 22 - 11,
+//         ex,
+//         topY + rng.nextDouble() * 14 - 7,
+//       );
+//       x += 40;
+//     }
+//     path.lineTo(size.width, size.height);
+//     path.lineTo(0, size.height);
+//     path.close();
+//     return path;
+//   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
+//   @override
+//   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+// }

@@ -21,6 +21,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
   final _plantsTabKey = GlobalKey<_PlantsTabState>();
+  final _calendarKey = GlobalKey<CalendarScreenState>();
+
+  void _onTabTap(int i) {
+    setState(() => _tab = i);
+    if (i == 1) {
+      // Reload calendar data whenever the tab is activated
+      _calendarKey.currentState?.reload();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
+        onTap: _onTabTap,
         backgroundColor: AppColors.darkOlive,
         selectedItemColor: AppColors.tan,
         unselectedItemColor: AppColors.tan.withValues(alpha: 0.45),
@@ -58,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _tab,
         children: [
           _PlantsTab(key: _plantsTabKey),
-          const CalendarScreen(),
+          CalendarScreen(key: _calendarKey),
         ],
       ),
     );
