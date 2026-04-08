@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:happy_plants/models/care_log.dart';
 import 'package:happy_plants/models/plant.dart';
+import 'package:happy_plants/models/plant_photo.dart';
 import 'package:happy_plants/repositories/care_log_repository.dart';
+import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 
@@ -28,12 +32,24 @@ const _monthNames = [
 
 const _weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-// ── Data model ────────────────────────────────────────────────────────────────
+// ── Data models ───────────────────────────────────────────────────────────────
 
 class _CalEvent {
   final CareLog log;
   final Plant plant;
   const _CalEvent({required this.log, required this.plant});
+}
+
+class _ScheduledCalEvent {
+  final Plant plant;
+  final DateTime date;
+  const _ScheduledCalEvent({required this.plant, required this.date});
+}
+
+class _PhotoEvent {
+  final PlantPhoto photo;
+  final Plant plant;
+  const _PhotoEvent({required this.photo, required this.plant});
 }
 
 // ── CalendarScreen ────────────────────────────────────────────────────────────
@@ -42,13 +58,17 @@ class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
+  State<CalendarScreen> createState() => CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class CalendarScreenState extends State<CalendarScreen> {
   late DateTime _month;
   List<_CalEvent> _events = [];
-  bool _loading = true;
+  List<_ScheduledCalEvent> _scheduledEvents = [];
+  List<_PhotoEvent> _photoEvents = [];
+  bool _loading = true;    // full-screen spinner (first load)
+  bool _refreshing = false; // header spinner (background refresh)
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -58,25 +78,83 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  /// Called externally (tab activated) — keeps existing data visible while refreshing.
+  void reload() => _load(background: true);
+
+  Future<void> _load({bool background = false}) async {
+    if (background && _events.isNotEmpty) {
+      setState(() => _refreshing = true);
+    } else {
+      setState(() { _loading = true; _refreshing = false; });
+    }
+
     final plantRepo = await PlantRepository.create();
     final logRepo = await CareLogRepository.create();
+    final photoRepo = await PlantPhotoRepository.create();
     final plants = await plantRepo.getAll();
     final logs = await logRepo.getAll();
+    final photos = await photoRepo.getAll();
 
     final plantMap = {for (final p in plants) p.id!: p};
+
     final events = <_CalEvent>[];
     for (final log in logs) {
       final plant = plantMap[log.plantId];
       if (plant != null) events.add(_CalEvent(log: log, plant: plant));
     }
+
+    final photoEvents = <_PhotoEvent>[];
+    for (final photo in photos) {
+      final plant = plantMap[photo.plantId];
+      if (plant != null) photoEvents.add(_PhotoEvent(photo: photo, plant: plant));
+    }
+
+    // Compute projected scheduled waterings for opted-in plants
+    final today = DateTime.now();
+    final scheduledEvents = <_ScheduledCalEvent>[];
+    for (final plant in plants) {
+      if (!plant.showScheduleOnCalendar) continue;
+      final last = plant.lastWateredDate;
+      if (last == null) continue;
+      final interval = plant.wateringIntervalDays;
+      var d = DateTime(last.year, last.month, last.day)
+          .add(Duration(days: interval));
+      final limit = today.add(const Duration(days: 90));
+      while (!d.isAfter(limit)) {
+        if (!d.isBefore(DateTime(today.year, today.month, today.day))) {
+          scheduledEvents.add(_ScheduledCalEvent(plant: plant, date: d));
+        }
+        d = d.add(Duration(days: interval));
+      }
+    }
+
     if (mounted) {
       setState(() {
         _events = events;
+        _photoEvents = photoEvents;
+        _scheduledEvents = scheduledEvents;
         _loading = false;
+        _refreshing = false;
       });
     }
+  }
+
+  Map<String, List<_ScheduledCalEvent>> get _scheduledMap {
+    final m = <String, List<_ScheduledCalEvent>>{};
+    for (final e in _scheduledEvents) {
+      final k = _dateKey(e.date);
+      (m[k] ??= []).add(e);
+    }
+    return m;
+  }
+
+  Map<String, List<_PhotoEvent>> get _photoMap {
+    final m = <String, List<_PhotoEvent>>{};
+    for (final e in _photoEvents) {
+      final k = _dateKey(e.photo.dateTaken);
+      (m[k] ??= []).add(e);
+    }
+    return m;
   }
 
   Map<String, List<_CalEvent>> get _eventMap {
@@ -108,8 +186,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _buildWeekdayRow(),
         if (_loading)
           const Expanded(child: Center(child: CircularProgressIndicator()))
-        else
-          Expanded(child: _buildMonthGrid()),
+        else ...[
+          // Grid takes its natural height (no Expanded)
+          _buildMonthGrid(),
+          const Divider(height: 1, color: AppColors.divider),
+          // Panel fills remaining space
+          Expanded(child: _buildDayPanel()),
+        ],
       ],
     );
   }
@@ -143,6 +226,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
             icon: const Icon(Icons.chevron_right, color: AppColors.tan),
             onPressed: _nextMonth,
           ),
+          if (_loading || _refreshing)
+            const SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: AppColors.tan,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh, color: AppColors.tan),
+              onPressed: _load,
+            ),
         ],
       ),
     );
@@ -174,6 +277,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final today = DateTime.now();
     final todayKey = _dateKey(today);
     final map = _eventMap;
+    final schedMap = _scheduledMap;
+    final photoMap = _photoMap;
 
     final firstWeekday = _month.weekday % 7; // 0 = Sunday
     final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
@@ -211,13 +316,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 final key = _dateKey(date);
                 final isToday = key == todayKey;
                 final events = map[key] ?? [];
+                final scheduled = schedMap[key] ?? [];
+                final photos = photoMap[key] ?? [];
 
                 return Expanded(
                   child: _DayCell(
                     dayNum: dayNum,
                     isToday: isToday,
                     events: events,
-                    onTap: () => _showDaySheet(context, date, events),
+                    scheduledEvents: scheduled,
+                    photoEvents: photos,
+                    isSelected: _selectedDate != null &&
+                        _dateKey(_selectedDate!) == key,
+                    onTap: () => _selectDay(date),
                   ),
                 );
               }),
@@ -228,21 +339,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  void _showDaySheet(
-      BuildContext context, DateTime date, List<_CalEvent> events) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.cream,
-      shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => _DaySheet(
-        date: date,
-        events: events,
-        onChanged: _load,
-      ),
+  void _selectDay(DateTime date) =>
+      setState(() => _selectedDate = date);
+
+  Widget _buildDayPanel() {
+    final sel = _selectedDate;
+    if (sel == null) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.touch_app_outlined,
+                size: 32, color: AppColors.divider),
+            SizedBox(height: 8),
+            Text(
+              'Tap a day to see events',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+    final key = _dateKey(sel);
+    final events = _eventMap[key] ?? [];
+    final scheduled = _scheduledMap[key] ?? [];
+    final photos = _photoMap[key] ?? [];
+    return _DayPanel(
+      key: ValueKey(key),
+      date: sel,
+      events: events,
+      scheduledEvents: scheduled,
+      photoEvents: photos,
+      onChanged: _load,
     );
   }
 }
@@ -252,13 +380,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
 class _DayCell extends StatelessWidget {
   final int dayNum;
   final bool isToday;
+  final bool isSelected;
   final List<_CalEvent> events;
+  final List<_ScheduledCalEvent> scheduledEvents;
+  final List<_PhotoEvent> photoEvents;
   final VoidCallback onTap;
 
   const _DayCell({
     required this.dayNum,
     required this.isToday,
+    required this.isSelected,
     required this.events,
+    required this.scheduledEvents,
+    required this.photoEvents,
     required this.onTap,
   });
 
@@ -272,26 +406,38 @@ class _DayCell extends StatelessWidget {
     return e.log.type == CareType.watering ? _waterColor : _fertColor;
   }
 
+  static const _schedGreen = Color(0xFF5B8A5F);
+
   @override
   Widget build(BuildContext context) {
-    final visible = events.length > 3 ? events.sublist(0, 2) : events;
-    final overflow = events.length > 3 ? events.length - 2 : 0;
-
+    final visibleEvents =
+        events.length > 2 ? events.sublist(0, 2) : events;
+    final eventOverflow = events.length > 2 ? events.length - 2 : 0;
+    final visibleSched =
+        scheduledEvents.length > 2 ? scheduledEvents.sublist(0, 1) : scheduledEvents;
+    final schedOverflow =
+        scheduledEvents.length > 2 ? scheduledEvents.length - 1 : 0;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         constraints: const BoxConstraints(minHeight: 70),
-        decoration: const BoxDecoration(
-          color: AppColors.cream,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.darkOlive.withValues(alpha: 0.07)
+              : AppColors.cream,
           border: Border(
-            right: BorderSide(color: AppColors.divider, width: 0.5),
-            bottom: BorderSide(color: AppColors.divider, width: 0.5),
+            right: const BorderSide(color: AppColors.divider, width: 0.5),
+            bottom: const BorderSide(color: AppColors.divider, width: 0.5),
+            top: isSelected
+                ? const BorderSide(color: AppColors.darkOlive, width: 1.5)
+                : BorderSide.none,
           ),
         ),
         padding: const EdgeInsets.all(4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Day number
             Container(
               width: 24,
               height: 24,
@@ -306,73 +452,134 @@ class _DayCell extends StatelessWidget {
                   '$dayNum',
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: isToday
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                    color: isToday
-                        ? Colors.white
-                        : AppColors.textPrimary,
+                    fontWeight:
+                        isToday ? FontWeight.w700 : FontWeight.w400,
+                    color: isToday ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 2),
-            ...List.generate(visible.length, (i) {
-              final e = visible[i];
+            // Actual logged events
+            ...List.generate(visibleEvents.length, (i) {
+              final e = visibleEvents[i];
               final color = _eventColor(e);
               final label = e.log.emoji ??
                   (e.log.type == CareType.watering ? '💧' : '🌱');
-              return Container(
-                margin: const EdgeInsets.only(bottom: 2),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 3, vertical: 1),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(3),
-                  border: Border.all(
-                      color: color.withValues(alpha: 0.5), width: 0.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(fontSize: 9)),
-                    const SizedBox(width: 2),
-                    Flexible(
-                      child: Text(
-                        e.plant.name,
-                        style: TextStyle(
-                          fontSize: 8,
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+              return _chip(label, e.plant.name, color,
+                  dashed: false);
             }),
-            if (overflow > 0)
-              Container(
-                margin: const EdgeInsets.only(bottom: 2),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 3, vertical: 1),
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  '+$overflow more',
-                  style: const TextStyle(
-                    fontSize: 8,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ),
+            if (eventOverflow > 0)
+              _overflowChip('+$eventOverflow'),
+            // Scheduled (projected) events — dashed green border
+            ...List.generate(visibleSched.length, (i) {
+              final s = visibleSched[i];
+              return _chip('💧', s.plant.name, _schedGreen,
+                  dashed: true);
+            }),
+            if (schedOverflow > 0)
+              _overflowChip('+$schedOverflow sched'),
+            // Photo thumbnails
+            if (photoEvents.isNotEmpty) _photoStrip(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _photoStrip() {
+    final visible = photoEvents.length > 3 ? photoEvents.sublist(0, 3) : photoEvents;
+    final overflow = photoEvents.length > 3 ? photoEvents.length - 3 : 0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ...visible.map((e) => Container(
+                width: 14,
+                height: 14,
+                margin: const EdgeInsets.only(right: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  color: const Color(0xFFCDD8E3),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.file(
+                    File(e.photo.filePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, e, s) => const Icon(
+                      Icons.photo_camera,
+                      size: 8,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+              )),
+          if (overflow > 0)
+            Text(
+              '+$overflow',
+              style: const TextStyle(
+                fontSize: 7,
+                color: AppColors.textMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String emoji, String name, Color color,
+      {required bool dashed}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: dashed ? Colors.transparent : color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(3),
+        border: dashed
+            ? Border.all(
+                color: color.withValues(alpha: 0.6),
+                width: 0.8,
+                strokeAlign: BorderSide.strokeAlignInside,
+              )
+            : Border.all(
+                color: color.withValues(alpha: 0.5), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 9)),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 8,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _overflowChip(String label) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.divider,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 8, color: AppColors.textMuted),
       ),
     );
   }
@@ -380,30 +587,27 @@ class _DayCell extends StatelessWidget {
 
 // ── Day Sheet ─────────────────────────────────────────────────────────────────
 
-class _DaySheet extends StatefulWidget {
+class _DayPanel extends StatefulWidget {
   final DateTime date;
   final List<_CalEvent> events;
+  final List<_ScheduledCalEvent> scheduledEvents;
+  final List<_PhotoEvent> photoEvents;
   final VoidCallback onChanged;
 
-  const _DaySheet({
+  const _DayPanel({
+    super.key,
     required this.date,
     required this.events,
+    required this.scheduledEvents,
+    required this.photoEvents,
     required this.onChanged,
   });
 
   @override
-  State<_DaySheet> createState() => _DaySheetState();
+  State<_DayPanel> createState() => _DayPanelState();
 }
 
-class _DaySheetState extends State<_DaySheet> {
-  late List<_CalEvent> _events;
-
-  @override
-  void initState() {
-    super.initState();
-    _events = List.of(widget.events);
-  }
-
+class _DayPanelState extends State<_DayPanel> {
   String _formatDate(DateTime d) {
     const days = [
       'Monday', 'Tuesday', 'Wednesday', 'Thursday',
@@ -425,10 +629,23 @@ class _DaySheetState extends State<_DaySheet> {
   Future<void> _delete(_CalEvent e) async {
     final repo = await CareLogRepository.create();
     await repo.delete(e.log.id!);
-    if (mounted) {
-      setState(
-          () => _events.removeWhere((x) => x.log.id == e.log.id));
-    }
+    widget.onChanged();
+  }
+
+  Future<void> _reschedule(_ScheduledCalEvent s) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: s.date,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Move next watering to…',
+    );
+    if (picked == null || !mounted) return;
+    final anchor = DateTime(picked.year, picked.month, picked.day)
+        .subtract(Duration(days: s.plant.wateringIntervalDays));
+    final updated = s.plant.copyWith(lastWateredDate: anchor);
+    final repo = await PlantRepository.create();
+    await repo.update(updated);
     widget.onChanged();
   }
 
@@ -440,88 +657,153 @@ class _DaySheetState extends State<_DaySheet> {
     if (updated == null || !mounted) return;
     final repo = await CareLogRepository.create();
     await repo.update(updated);
-    if (mounted) {
-      setState(() {
-        final idx =
-            _events.indexWhere((x) => x.log.id == updated.id);
-        if (idx != -1) {
-          _events[idx] =
-              _CalEvent(log: updated, plant: e.plant);
-        }
-      });
-    }
     widget.onChanged();
+  }
+
+  void _viewPhotos(List<_PhotoEvent> photos, int initialIndex) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: _CalPhotoViewer(photos: photos, initialIndex: initialIndex),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final maxH = MediaQuery.of(context).size.height * 0.75;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxH),
-      child: Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 4),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
+    final events = widget.events;
+    final scheduled = widget.scheduledEvents;
+    final photos = widget.photoEvents;
+    final hasAny = events.isNotEmpty || scheduled.isNotEmpty || photos.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Text(
+            _formatDate(widget.date),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 10),
-              child: Text(
-                _formatDate(widget.date),
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-            const Divider(height: 1, color: AppColors.divider),
-            if (_events.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'No events on this day',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: AppColors.textMuted, fontSize: 15),
-                ),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _events.length,
-                  separatorBuilder: (_, _) => const Divider(
-                      height: 1, color: AppColors.divider),
-                  itemBuilder: (_, i) => _EventTile(
-                    event: _events[i],
-                    color: _eventColor(_events[i]),
-                    onEdit: () => _edit(_events[i]),
-                    onDelete: () => _delete(_events[i]),
-                  ),
-                ),
-              ),
-            SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 8),
-          ],
+          ),
         ),
-      ),
+        const Divider(height: 1, color: AppColors.divider),
+        if (!hasAny)
+          const Expanded(
+            child: Center(
+              child: Text(
+                'No events on this day',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(top: 4, bottom: 16),
+              children: [
+                ...events.map((e) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _EventTile(
+                          event: e,
+                          color: _eventColor(e),
+                          onEdit: () => _edit(e),
+                          onDelete: () => _delete(e),
+                        ),
+                        const Divider(height: 1, color: AppColors.divider),
+                      ],
+                    )),
+                if (scheduled.isNotEmpty) ...[
+                  if (events.isNotEmpty) const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                    child: Text(
+                      'SCHEDULED',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  ...scheduled.map((s) => _ScheduledEventTile(
+                        scheduled: s,
+                        onReschedule: () => _reschedule(s),
+                      )),
+                ],
+                if (photos.isNotEmpty) ...[
+                  if (events.isNotEmpty || scheduled.isNotEmpty)
+                    const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                    child: Text(
+                      'PHOTOS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(photos.length, (i) {
+                        final e = photos[i];
+                        return GestureDetector(
+                          onTap: () => _viewPhotos(photos, i),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(e.photo.filePath),
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, err, s) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: AppColors.divider,
+                                    child: const Icon(Icons.broken_image,
+                                        size: 28, color: AppColors.textMuted),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              SizedBox(
+                                width: 80,
+                                child: Text(
+                                  e.plant.name,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.textMuted,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -615,6 +897,74 @@ class _EventTile extends StatelessWidget {
               color: AppColors.statusRed,
               onPressed: onDelete,
               tooltip: 'Delete',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Scheduled Event Tile ──────────────────────────────────────────────────────
+
+class _ScheduledEventTile extends StatelessWidget {
+  final _ScheduledCalEvent scheduled;
+  final VoidCallback onReschedule;
+
+  const _ScheduledEventTile({
+    required this.scheduled,
+    required this.onReschedule,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF5B8A5F);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: const Border(
+          left: BorderSide(color: color, width: 3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: Row(
+          children: [
+            const Text('💧', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    scheduled.plant.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Text(
+                    'Scheduled watering',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.calendar_month, size: 14),
+              label: const Text('Reschedule'),
+              style: TextButton.styleFrom(
+                foregroundColor: color,
+                textStyle: const TextStyle(fontSize: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed: onReschedule,
             ),
           ],
         ),
@@ -909,3 +1259,94 @@ class _TypeChip extends StatelessWidget {
     );
   }
 }
+
+// ── Photo Viewer ──────────────────────────────────────────────────────────────
+
+class _CalPhotoViewer extends StatefulWidget {
+  final List<_PhotoEvent> photos;
+  final int initialIndex;
+  const _CalPhotoViewer({required this.photos, required this.initialIndex});
+
+  @override
+  State<_CalPhotoViewer> createState() => _CalPhotoViewerState();
+}
+
+class _CalPhotoViewerState extends State<_CalPhotoViewer> {
+  late final PageController _page;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _page = PageController(initialPage: _index);
+  }
+
+  @override
+  void dispose() {
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _page,
+          itemCount: widget.photos.length,
+          onPageChanged: (i) => setState(() => _index = i),
+          itemBuilder: (_, i) => InteractiveViewer(
+            child: Image.file(
+              File(widget.photos[i].photo.filePath),
+              fit: BoxFit.contain,
+              errorBuilder: (_, e, s) => const Center(
+                child: Icon(Icons.broken_image, size: 64, color: Colors.white54),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        if (widget.photos.length > 1)
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.photos[_index].plant.name,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                Text(
+                  '${_index + 1} / ${widget.photos.length}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ),
+          )
+        else
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                widget.photos[0].plant.name,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
