@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -11,6 +12,7 @@ import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/screens/add_plant_screen.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:happy_plants/widgets/plant_care_calendar.dart';
 import 'package:happy_plants/widgets/plant_widget.dart';
 
 class PlantDetailScreen extends StatefulWidget {
@@ -24,10 +26,11 @@ class PlantDetailScreen extends StatefulWidget {
 
 class _PlantDetailScreenState extends State<PlantDetailScreen> {
   late Plant _plant;
-  late Future<List<CareLog>> _logsFuture;
-  late Future<List<PlantPhoto>> _photosFuture;
+  List<CareLog> _logs = [];
+  List<PlantPhoto> _photos = [];
   bool _actionPending = false;
   final _picker = ImagePicker();
+  final _pageScroll = ScrollController();
 
   @override
   void initState() {
@@ -37,14 +40,22 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     _refreshPhotos();
   }
 
-  void _refreshLogs() {
-    _logsFuture = CareLogRepository.create()
-        .then((repo) => repo.getByPlantId(_plant.id!));
+  @override
+  void dispose() {
+    _pageScroll.dispose();
+    super.dispose();
   }
 
-  void _refreshPhotos() {
-    _photosFuture = PlantPhotoRepository.create()
-        .then((repo) => repo.getByPlantId(_plant.id!));
+  Future<void> _refreshLogs() async {
+    final repo = await CareLogRepository.create();
+    final logs = await repo.getByPlantId(_plant.id!);
+    if (mounted) setState(() => _logs = logs);
+  }
+
+  Future<void> _refreshPhotos() async {
+    final repo = await PlantPhotoRepository.create();
+    final photos = await repo.getByPlantId(_plant.id!);
+    if (mounted) setState(() => _photos = photos);
   }
 
   Future<void> _logCare(CareType type) async {
@@ -254,10 +265,15 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           _buildHeader(context, overdue),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              controller: _pageScroll,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   _InfoCard(plant: _plant),
                   const SizedBox(height: 20),
                   _ActionButtons(
@@ -285,18 +301,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  FutureBuilder<List<PlantPhoto>>(
-                    future: _photosFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 110,
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      final photos = snapshot.data ?? [];
-                      if (photos.isEmpty) {
-                        return GestureDetector(
+                  _photos.isEmpty
+                      ? GestureDetector(
                           onTap: _showAddPhotoSheet,
                           child: Container(
                             height: 90,
@@ -311,131 +317,121 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    Icons.add_a_photo_outlined,
-                                    color: AppColors.textMuted,
-                                    size: 28,
-                                  ),
+                                  const Icon(Icons.add_a_photo_outlined,
+                                      color: AppColors.textMuted, size: 28),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    'Tap to add your first photo',
-                                    style: Theme.of(context).textTheme.bodyMedium,
-                                  ),
+                                  Text('Tap to add your first photo',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium),
                                 ],
                               ),
                             ),
                           ),
-                        );
-                      }
-                      return SizedBox(
-                        height: 110,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: photos.length + 1,
-                          separatorBuilder: (_, _) => const SizedBox(width: 8),
-                          itemBuilder: (context, i) {
-                            if (i == photos.length) {
-                              // Add button at end
-                              return GestureDetector(
-                                onTap: _showAddPhotoSheet,
-                                child: Container(
-                                  width: 90,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cardBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: AppColors.textMuted
-                                          .withValues(alpha: 0.2),
+                        )
+                      : SizedBox(
+                          height: 110,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _photos.length + 1,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, i) {
+                              if (i == _photos.length) {
+                                return GestureDetector(
+                                  onTap: _showAddPhotoSheet,
+                                  child: Container(
+                                    width: 90,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.cardBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppColors.textMuted
+                                            .withValues(alpha: 0.2),
+                                      ),
                                     ),
+                                    child: const Icon(Icons.add,
+                                        color: AppColors.textMuted, size: 28),
                                   ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: AppColors.textMuted,
-                                    size: 28,
-                                  ),
-                                ),
-                              );
-                            }
-                            final photo = photos[i];
-                            return GestureDetector(
-                              onTap: () => _openPhoto(photo),
-                              onLongPress: () =>
-                                  _showPhotoOptions(photo, photos),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Image.file(
-                                      File(photo.filePath),
-                                      width: 90,
-                                      height: 110,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
+                                );
+                              }
+                              final photo = _photos[i];
+                              return GestureDetector(
+                                onTap: () => _openPhoto(photo),
+                                onLongPress: () =>
+                                    _showPhotoOptions(photo, _photos),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(
+                                        File(photo.filePath),
                                         width: 90,
                                         height: 110,
-                                        color: AppColors.cardBg,
-                                        child: const Icon(
-                                          Icons.broken_image_outlined,
-                                          color: AppColors.textMuted,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          width: 90,
+                                          height: 110,
+                                          color: AppColors.cardBg,
+                                          child: const Icon(
+                                              Icons.broken_image_outlined,
+                                              color: AppColors.textMuted),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  if (photo.isCover)
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.darkOlive,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.star,
-                                          color: Colors.white,
-                                          size: 12,
+                                    if (photo.isCover)
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                              color: AppColors.darkOlive,
+                                              shape: BoxShape.circle),
+                                          child: const Icon(Icons.star,
+                                              color: Colors.white, size: 12),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      );
+                  const SizedBox(height: 24),
+                  Text('Care Schedule',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  PlantCareCalendar(
+                    plant: _plant,
+                    logs: _logs,
+                    photos: _photos,
+                    parentScrollController: _pageScroll,
+                    onRefresh: () {
+                      _refreshLogs();
+                      _refreshPhotos();
                     },
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Care History',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Care History',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
-                  FutureBuilder<List<CareLog>>(
-                    future: _logsFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final logs = snapshot.data ?? [];
-                      if (logs.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Text(
-                            'No care logged yet',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return Column(
-                        children: logs
-                            .map((log) => _CareLogTile(log: log))
-                            .toList(),
-                      );
-                    },
+                  if (_logs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text('No care logged yet',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center),
+                    )
+                  else
+                    Column(
+                      children:
+                          _logs.map((log) => _CareLogTile(log: log)).toList(),
+                    ),
+                      ],
+                    ),
                   ),
+                  const _SoilSection(),
                 ],
               ),
             ),
@@ -456,70 +452,61 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   }
 
   Widget _buildHeader(BuildContext context, bool overdue) {
-    return FutureBuilder<List<PlantPhoto>>(
-      future: _photosFuture,
-      builder: (context, snapshot) {
-        final photos = snapshot.data ?? [];
-        final cover = photos.where((p) => p.isCover).firstOrNull;
+    final cover = _photos.where((p) => p.isCover).firstOrNull;
 
-        if (cover != null && File(cover.filePath).existsSync()) {
-          return _CoverPhotoHeader(
-            plant: _plant,
-            coverPhoto: cover,
-            onBack: () => Navigator.pop(context, false),
-            onEdit: _editPlant,
-            onDelete: _deletePlant,
-          );
-        }
+    if (cover != null && File(cover.filePath).existsSync()) {
+      return _CoverPhotoHeader(
+        plant: _plant,
+        coverPhoto: cover,
+        onBack: () => Navigator.pop(context, false),
+        onEdit: _editPlant,
+        onDelete: _deletePlant,
+      );
+    }
 
-        return Container(
-          color: AppColors.brown,
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 8,
-            right: 8,
-            bottom: 0,
-          ),
-          child: Column(
+    return Container(
+      color: AppColors.brown,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 8,
+        right: 8,
+        bottom: 0,
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon:
-                        const Icon(Icons.arrow_back, color: AppColors.tan),
-                    onPressed: () => Navigator.pop(context, false),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _plant.name,
-                      style: Theme.of(context).textTheme.headlineLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined,
-                        color: AppColors.tan),
-                    onPressed: _editPlant,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.tan),
-                    onPressed: _deletePlant,
-                  ),
-                ],
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.tan),
+                onPressed: () => Navigator.pop(context, false),
               ),
-              const SizedBox(height: 8),
-              PlantWidget(
-                isHappy: !overdue,
-                size: 150,
-                plantKey: _plant.plantKey,
+              Expanded(
+                child: Text(
+                  _plant.name,
+                  style: Theme.of(context).textTheme.headlineLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 16),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: AppColors.tan),
+                onPressed: _editPlant,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppColors.tan),
+                onPressed: _deletePlant,
+              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          PlantWidget(
+            isHappy: !overdue,
+            size: 150,
+            plantKey: _plant.plantKey,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }
@@ -810,4 +797,153 @@ class _CareLogTile extends StatelessWidget {
 
   String _formatDate(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+// ── Soil section ──────────────────────────────────────────────────────────────
+
+class _SoilSection extends StatelessWidget {
+  const _SoilSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 600,
+      width: double.infinity,
+      child: CustomPaint(painter: _SoilPainter()),
+    );
+  }
+}
+
+class _SoilPainter extends CustomPainter {
+  static final _specRng = Random(42);
+  static final _rockRng = Random(7);
+
+  // Transition specs spread across 0..1 (mapped to 0..transitionZone in paint).
+  // ty uses sqrt bias so more specs cluster near the bottom of the zone.
+  // Size (not opacity) encodes depth: tiny at top, larger at bottom.
+  static const _specColors = [
+    Color(0xFF5C3517), // dark brown
+    Color(0xFF7A4F28), // medium brown
+    Color(0xFF3B2009), // near-black earth
+  ];
+
+  static final _specs = List.generate(200, (_) {
+    final t = _specRng.nextDouble();
+    return (
+      tx: _specRng.nextDouble(),
+      ty: sqrt(t),
+      baseR: _specRng.nextDouble(),
+      ci: _specRng.nextInt(_specColors.length),
+    );
+  });
+
+  // Rocks — only in solid portion
+  static final _rocks = List.generate(26, (_) => (
+    tx: _rockRng.nextDouble(),
+    ty: 0.48 + _rockRng.nextDouble() * 0.52,
+    w: 7.0 + _rockRng.nextDouble() * 22,
+    h: 5.0 + _rockRng.nextDouble() * 13,
+    dark: _rockRng.nextBool(),
+  ));
+
+  // Fine texture dots — only in solid portion
+  static final _dots = List.generate(70, (_) => (
+    tx: _rockRng.nextDouble(),
+    ty: 0.48 + _rockRng.nextDouble() * 0.52,
+    r: 0.8 + _rockRng.nextDouble() * 1.8,
+  ));
+
+  // Solid soil starts at 48% of the widget height
+  static const _solidStart = 0.34;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final solidY = size.height * _solidStart;
+
+    // ── Solid soil background ──────────────────────────────────────────
+    canvas.drawRect(
+      Rect.fromLTWH(0, solidY, size.width, size.height - solidY),
+      Paint()..color = const Color(0xFF5C3517),
+    );
+
+    // ── Sub-layers (4 layers, evenly spaced across solid portion) ──────
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.60, Random(3)),
+      Paint()..color = const Color(0xFF6B3E1A),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.70, Random(19)),
+      Paint()..color = const Color(0xFF7A4F28),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.81, Random(7)),
+      Paint()..color = const Color(0xFF8E5F32),
+    );
+    canvas.drawPath(
+      _wavyLayer(size, size.height * 0.91, Random(31)),
+      Paint()..color = const Color(0xFF9B6B3A),
+    );
+
+    // ── Rocks ─────────────────────────────────────────────────────────
+    for (final r in _rocks) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(r.tx * size.width, r.ty * size.height),
+          width: r.w,
+          height: r.h,
+        ),
+        Paint()
+          ..color =
+              r.dark ? const Color(0xFF8A7060) : const Color(0xFFB09878),
+      );
+    }
+
+    // ── Fine texture dots ──────────────────────────────────────────────
+    final dotPaint = Paint()..color = const Color(0x55200E00);
+    for (final d in _dots) {
+      canvas.drawCircle(
+        Offset(d.tx * size.width, d.ty * size.height),
+        d.r,
+        dotPaint,
+      );
+    }
+
+    // ── Transition specs ───────────────────────────────────────────────
+    // Zone extends from 0 to solidY + small overlap into solid.
+    // Size grows from ~0.4 px at top to ~5 px at solidY (quadratic).
+    // No opacity change — size alone creates the fade effect.
+    final specZoneH = solidY * 1.4;
+    final maxSpecR = size.width / 7;
+    final specPaint = Paint();
+    for (final s in _specs) {
+      final y = s.ty * specZoneH;
+      final depthT = (y / specZoneH).clamp(0.0, 1.0);
+      final r = (0.4 + s.baseR * (maxSpecR - 0.4)) * depthT * depthT;
+      if (r < 0.3) continue;
+      specPaint.color = _specColors[s.ci];
+      canvas.drawCircle(Offset(s.tx * size.width, y), r, specPaint);
+    }
+  }
+
+  Path _wavyLayer(Size size, double topY, Random rng) {
+    final path = Path()..moveTo(0, topY);
+    double x = 0;
+    while (x < size.width) {
+      final ex = (x + 40).clamp(0.0, size.width);
+      path.quadraticBezierTo(
+        x + 20,
+        topY + rng.nextDouble() * 22 - 11,
+        ex,
+        topY + rng.nextDouble() * 14 - 7,
+      );
+      x += 40;
+    }
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
