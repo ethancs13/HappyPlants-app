@@ -16,7 +16,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'happy_plants.db');
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -43,6 +43,8 @@ class DatabaseHelper {
         type TEXT NOT NULL,
         date TEXT NOT NULL,
         notes TEXT,
+        emoji TEXT,
+        color TEXT,
         FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
       )
     ''');
@@ -101,6 +103,10 @@ class DatabaseHelper {
           FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
         )
       ''');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE care_logs ADD COLUMN emoji TEXT');
+      await db.execute('ALTER TABLE care_logs ADD COLUMN color TEXT');
     }
     if (oldVersion < 4) {
       await db.execute('''
