@@ -10,6 +10,7 @@ import 'package:happy_plants/repositories/care_log_repository.dart';
 import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/screens/add_plant_screen.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:happy_plants/widgets/plant_care_calendar.dart';
 import 'package:happy_plants/widgets/plant_widget.dart';
@@ -82,6 +83,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         });
         _refreshLogs();
       }
+      if (type == CareType.watering) {
+        await NotificationService.scheduleWateringReminder(updated);
+      }
     } catch (_) {
       if (mounted) setState(() => _actionPending = false);
     }
@@ -148,6 +152,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final repo = await PlantRepository.create();
     await repo.update(updated);
     if (mounted) setState(() => _plant = updated);
+    await NotificationService.scheduleWateringReminder(updated);
   }
 
   Future<void> _showAddPhotoSheet() async {
@@ -278,6 +283,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     await logRepo.deleteByPlantId(_plant.id!);
     await photoRepo.deleteByPlantId(_plant.id!);
     await plantRepo.delete(_plant.id!);
+    await NotificationService.cancelReminder(_plant.id!);
 
     if (mounted) Navigator.pop(context, true);
   }
