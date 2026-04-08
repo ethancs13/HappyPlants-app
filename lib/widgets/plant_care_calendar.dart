@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:happy_plants/models/care_log.dart';
 import 'package:happy_plants/models/plant.dart';
@@ -5,27 +7,6 @@ import 'package:happy_plants/models/plant_photo.dart';
 import 'package:happy_plants/repositories/care_log_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/theme/app_theme.dart';
-
-// ── Time slots ────────────────────────────────────────────────────────────────
-
-enum _Slot { morning, afternoon }
-
-extension _SlotX on _Slot {
-  String get label => switch (this) {
-        _Slot.morning => 'AM',
-        _Slot.afternoon => 'PM',
-      };
-
-  int get defaultHour => switch (this) {
-        _Slot.morning => 9,
-        _Slot.afternoon => 14,
-      };
-
-  static _Slot fromHour(int hour) {
-    if (hour < 12) return _Slot.morning;
-    return _Slot.afternoon;
-  }
-}
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +37,9 @@ class PlantCareCalendar extends StatefulWidget {
   final ScrollController? parentScrollController;
   final VoidCallback onRefresh;
 
+  /// Called when the user picks a new next-watering date via "Reschedule cycle".
+  final void Function(DateTime newNextWateringDate)? onReschedule;
+
   const PlantCareCalendar({
     super.key,
     required this.plant,
@@ -63,6 +47,7 @@ class PlantCareCalendar extends StatefulWidget {
     required this.photos,
     this.parentScrollController,
     required this.onRefresh,
+    this.onReschedule,
   });
 
   @override
@@ -137,21 +122,22 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     super.dispose();
   }
 
-  // "yyyy-MM-dd" → true if a photo was taken that day
-  Set<String> get _photoDateSet {
-    final s = <String>{};
-    for (final p in widget.photos) {
-      s.add(_dk(p.dateTaken));
-    }
-    return s;
-  }
-
-  // "yyyy-MM-dd|slotName" → logs in that cell
+  // "yyyy-MM-dd" → logs for that day
   Map<String, List<CareLog>> get _logMap {
     final m = <String, List<CareLog>>{};
     for (final log in widget.logs) {
-      final k = '${_dk(log.date)}|${_SlotX.fromHour(log.date.hour).name}';
+      final k = _dk(log.date);
       (m[k] ??= []).add(log);
+    }
+    return m;
+  }
+
+  // "yyyy-MM-dd" → photos taken that day
+  Map<String, List<PlantPhoto>> get _photoMap {
+    final m = <String, List<PlantPhoto>>{};
+    for (final p in widget.photos) {
+      final k = _dk(p.dateTaken);
+      (m[k] ??= []).add(p);
     }
     return m;
   }
@@ -180,33 +166,36 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
   @override
   Widget build(BuildContext context) {
     final logMap = _logMap;
+    final photoMap = _photoMap;
     final scheduled = _scheduled;
-    final photoDateSet = _photoDateSet;
 
     return SizedBox(
-      height: _headerH + _Slot.values.length * _rowH,
+      height: _headerH + 2 * _rowH,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fixed time-label column
+          // Fixed row-label column
           SizedBox(
             width: _labelW,
             child: Column(
               children: [
                 SizedBox(height: _headerH),
-                ..._Slot.values.map((s) => SizedBox(
-                      height: _rowH,
-                      child: Center(
-                        child: Text(
-                          s.label,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    )),
+                // Care row icon
+                SizedBox(
+                  height: _rowH,
+                  child: const Center(
+                    child: Icon(Icons.eco,
+                        size: 14, color: AppColors.textMuted),
+                  ),
+                ),
+                // Photo row icon
+                SizedBox(
+                  height: _rowH,
+                  child: const Center(
+                    child: Icon(Icons.photo_camera,
+                        size: 14, color: AppColors.textMuted),
+                  ),
+                ),
               ],
             ),
           ),
@@ -228,15 +217,14 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                           return _DayHeader(
                             day: day,
                             isToday: day == _today,
-                            hasPhoto: photoDateSet.contains(_dk(day)),
                             width: _colW,
                           );
                         }),
                       ),
                     ),
-                    // Slot area — column-first so today can span both rows
+                    // Care + photo rows
                     SizedBox(
-                      height: _Slot.values.length * _rowH,
+                      height: 2 * _rowH,
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: List.generate(_totalDays, (i) {
@@ -244,25 +232,32 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                           final isToday = day == _today;
                           final dayStr = _dk(day);
                           final isFuture = day.isAfter(_today);
+                          final dayLogs = logMap[dayStr] ?? [];
+                          final dayPhotos = photoMap[dayStr] ?? [];
+                          final isScheduled =
+                              scheduled.contains(dayStr) && isFuture;
 
-                          final cells = _Slot.values.map((slot) {
-                            final key = '$dayStr|${slot.name}';
-                            final cellLogs = logMap[key] ?? [];
-                            final isScheduled =
-                                scheduled.contains(dayStr) &&
-                                    slot == _Slot.morning &&
-                                    isFuture;
-                            return _CalendarCell(
+                          final cells = [
+                            _CalendarCell(
                               width: _colW,
                               height: _rowH,
-                              logs: cellLogs,
+                              logs: dayLogs,
                               isScheduled: isScheduled,
                               isFuture: isFuture,
-                              onTap: () => _onTap(day, slot, cellLogs),
+                              onTap: () => _onTap(day, dayLogs,
+                                  isScheduled: isScheduled),
                               onLongPressStart: (pos) =>
-                                  _onLongPress(day, slot, cellLogs, pos),
-                            );
-                          }).toList();
+                                  _onLongPress(day, dayLogs, pos),
+                            ),
+                            _PhotoCell(
+                              width: _colW,
+                              height: _rowH,
+                              photos: dayPhotos,
+                              onTap: dayPhotos.isNotEmpty
+                                  ? () => _viewPhotos(dayPhotos)
+                                  : null,
+                            ),
+                          ];
 
                           if (isToday) {
                             return SizedBox(
@@ -294,27 +289,39 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     );
   }
 
-  Future<void> _onTap(
-      DateTime day, _Slot slot, List<CareLog> existing) async {
+  Future<void> _onTap(DateTime day, List<CareLog> existing,
+      {bool isScheduled = false}) async {
     final refresh = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: _QuickLogSheet(
           day: day,
-          slot: slot,
           plant: widget.plant,
           existing: existing,
+          isScheduled: isScheduled,
+          onReschedule: widget.onReschedule,
         ),
       ),
     );
     if (refresh == true && mounted) widget.onRefresh();
   }
 
+  void _viewPhotos(List<PlantPhoto> photos) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: _PhotoViewer(photos: photos),
+      ),
+    );
+  }
+
   OverlayEntry? _radialMenu;
 
   void _onLongPress(
-      DateTime day, _Slot slot, List<CareLog> existing, Offset globalPos) {
+      DateTime day, List<CareLog> existing, Offset globalPos) {
     _dismissRadialMenu();
     final entry = OverlayEntry(
       builder: (_) => _RadialMenu(
@@ -323,7 +330,7 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
         onDismiss: _dismissRadialMenu,
         onEdit: () {
           _dismissRadialMenu();
-          _openCustomLog(day, slot, existing);
+          _openCustomLog(day, existing);
         },
         onDelete: existing.isNotEmpty
             ? () {
@@ -342,15 +349,13 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
     _radialMenu = null;
   }
 
-  Future<void> _openCustomLog(
-      DateTime day, _Slot slot, List<CareLog> existing) async {
+  Future<void> _openCustomLog(DateTime day, List<CareLog> existing) async {
     final refresh = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: _CustomLogSheet(
           day: day,
-          slot: slot,
           plant: widget.plant,
           existing: existing,
         ),
@@ -373,13 +378,11 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
 class _DayHeader extends StatelessWidget {
   final DateTime day;
   final bool isToday;
-  final bool hasPhoto;
   final double width;
 
   const _DayHeader({
     required this.day,
     required this.isToday,
-    required this.hasPhoto,
     required this.width,
   });
 
@@ -417,15 +420,6 @@ class _DayHeader extends StatelessWidget {
                   color: isToday ? Colors.white : AppColors.textPrimary,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              color: hasPhoto ? _waterColor : Colors.transparent,
-              shape: BoxShape.circle,
             ),
           ),
         ],
@@ -552,19 +546,164 @@ class _CalendarCell extends StatelessWidget {
   }
 }
 
+// ── Photo cell ────────────────────────────────────────────────────────────────
+
+class _PhotoCell extends StatelessWidget {
+  final double width;
+  final double height;
+  final List<PlantPhoto> photos;
+  final VoidCallback? onTap;
+
+  const _PhotoCell({
+    required this.width,
+    required this.height,
+    required this.photos,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhotos = photos.isNotEmpty;
+    return SizedBox(
+      width: width,
+      height: height,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            color: hasPhotos
+                ? const Color(0xFFE8EFF5)
+                : const Color(0xFFF0EDE5),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: hasPhotos ? _thumbnail() : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbnail() {
+    final first = photos.first;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.file(
+            File(first.filePath),
+            fit: BoxFit.cover,
+            errorBuilder: (_, e, s) => const Icon(
+              Icons.broken_image,
+              size: 16,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ),
+        if (photos.length > 1)
+          Positioned(
+            bottom: 2,
+            right: 3,
+            child: Text(
+              '+${photos.length - 1}',
+              style: const TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Photo viewer dialog ────────────────────────────────────────────────────────
+
+class _PhotoViewer extends StatefulWidget {
+  final List<PlantPhoto> photos;
+  const _PhotoViewer({required this.photos});
+
+  @override
+  State<_PhotoViewer> createState() => _PhotoViewerState();
+}
+
+class _PhotoViewerState extends State<_PhotoViewer> {
+  late final PageController _page;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = PageController();
+  }
+
+  @override
+  void dispose() {
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _page,
+          itemCount: widget.photos.length,
+          onPageChanged: (i) => setState(() => _index = i),
+          itemBuilder: (_, i) => InteractiveViewer(
+            child: Image.file(
+              File(widget.photos[i].filePath),
+              fit: BoxFit.contain,
+              errorBuilder: (_, e, s) => const Center(
+                child: Icon(Icons.broken_image,
+                    size: 64, color: Colors.white54),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        if (widget.photos.length > 1)
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                '${_index + 1} / ${widget.photos.length}',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 // ── Quick log sheet (tap) ─────────────────────────────────────────────────────
 
 class _QuickLogSheet extends StatefulWidget {
   final DateTime day;
-  final _Slot slot;
   final Plant plant;
   final List<CareLog> existing;
+  final bool isScheduled;
+  final void Function(DateTime)? onReschedule;
 
   const _QuickLogSheet({
     required this.day,
-    required this.slot,
     required this.plant,
     required this.existing,
+    this.isScheduled = false,
+    this.onReschedule,
   });
 
   @override
@@ -581,16 +720,15 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
     ];
     const dow = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final d = widget.day;
-    return '${dow[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}'
-        ' — ${widget.slot.label}';
+    return '${dow[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
   }
 
   Future<void> _log(CareType type) async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final logDate = DateTime(widget.day.year, widget.day.month,
-          widget.day.day, widget.slot.defaultHour);
+      final logDate =
+          DateTime(widget.day.year, widget.day.month, widget.day.day, 9);
       final repo = await CareLogRepository.create();
       await repo.insert(
           CareLog(plantId: widget.plant.id!, type: type, date: logDate));
@@ -694,6 +832,33 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                   ),
                 ],
               ),
+            if (widget.isScheduled && widget.onReschedule != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_month, size: 16),
+                  label: const Text('Reschedule cycle'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textMuted,
+                    side: const BorderSide(color: AppColors.divider),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: widget.day,
+                      firstDate: DateTime.now(),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365)),
+                      helpText: 'Move next watering to…',
+                    );
+                    if (picked != null) widget.onReschedule!(picked);
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -705,13 +870,11 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
 
 class _CustomLogSheet extends StatefulWidget {
   final DateTime day;
-  final _Slot slot;
   final Plant plant;
   final List<CareLog> existing;
 
   const _CustomLogSheet({
     required this.day,
-    required this.slot,
     required this.plant,
     required this.existing,
   });
@@ -740,8 +903,7 @@ class _CustomLogSheetState extends State<_CustomLogSheet> {
     ];
     const dow = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final d = widget.day;
-    return '${dow[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}'
-        ' — ${widget.slot.label}';
+    return '${dow[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
   }
 
   String _hexColor(Color c) {
@@ -755,8 +917,8 @@ class _CustomLogSheetState extends State<_CustomLogSheet> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final logDate = DateTime(widget.day.year, widget.day.month,
-          widget.day.day, widget.slot.defaultHour);
+      final logDate =
+          DateTime(widget.day.year, widget.day.month, widget.day.day, 9);
       final repo = await CareLogRepository.create();
       await repo.insert(CareLog(
         plantId: widget.plant.id!,
