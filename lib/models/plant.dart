@@ -10,6 +10,9 @@ class Plant {
   /// e.g. 'plant_01' … 'plant_15'. Null = use the default drawn widget.
   final String? plantKey;
 
+  /// Whether this plant's projected schedule appears on the global calendar.
+  final bool showScheduleOnCalendar;
+
   const Plant({
     this.id,
     required this.name,
@@ -19,6 +22,7 @@ class Plant {
     this.lastFertilizedDate,
     this.notes,
     this.plantKey,
+    this.showScheduleOnCalendar = false,
   });
 
   DateTime? get nextWateringDate {
@@ -41,6 +45,7 @@ class Plant {
     DateTime? lastFertilizedDate,
     String? notes,
     String? plantKey,
+    bool? showScheduleOnCalendar,
   }) {
     return Plant(
       id: id ?? this.id,
@@ -51,6 +56,8 @@ class Plant {
       lastFertilizedDate: lastFertilizedDate ?? this.lastFertilizedDate,
       notes: notes ?? this.notes,
       plantKey: plantKey ?? this.plantKey,
+      showScheduleOnCalendar:
+          showScheduleOnCalendar ?? this.showScheduleOnCalendar,
     );
   }
 
@@ -64,6 +71,7 @@ class Plant {
       'last_fertilized_date': lastFertilizedDate?.toIso8601String(),
       'notes': notes,
       'plant_key': plantKey,
+      'schedule_on_calendar': showScheduleOnCalendar ? 1 : 0,
     };
   }
 
@@ -81,6 +89,8 @@ class Plant {
           : null,
       notes: map['notes'] as String?,
       plantKey: map['plant_key'] as String?,
+      showScheduleOnCalendar:
+          (map['schedule_on_calendar'] as int? ?? 0) == 1,
     );
   }
 }
