@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:happy_plants/models/plant.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:happy_plants/widgets/plant_picker.dart';
 
@@ -66,7 +67,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         await repo.update(updated);
         if (mounted) Navigator.pop(context, updated);
       } else {
-        await repo.insert(Plant(
+        final newPlant = Plant(
           name: _nameController.text.trim(),
           species: _speciesController.text.trim(),
           wateringIntervalDays: int.parse(_intervalController.text.trim()),
@@ -74,7 +75,10 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
               ? null
               : _notesController.text.trim(),
           plantKey: _selectedPlantKey,
-        ));
+        );
+        final newId = await repo.insert(newPlant);
+        await NotificationService.scheduleWateringReminder(
+            newPlant.copyWith(id: newId));
         if (mounted) Navigator.pop(context, true);
       }
     } finally {
