@@ -13,6 +13,9 @@ class Plant {
   /// Whether this plant's projected schedule appears on the global calendar.
   final bool showScheduleOnCalendar;
 
+  /// Whether watering reminder notifications are enabled for this plant.
+  final bool notificationsEnabled;
+
   const Plant({
     this.id,
     required this.name,
@@ -23,6 +26,7 @@ class Plant {
     this.notes,
     this.plantKey,
     this.showScheduleOnCalendar = false,
+    this.notificationsEnabled = true,
   });
 
   DateTime? get nextWateringDate {
@@ -46,6 +50,7 @@ class Plant {
     String? notes,
     String? plantKey,
     bool? showScheduleOnCalendar,
+    bool? notificationsEnabled,
   }) {
     return Plant(
       id: id ?? this.id,
@@ -58,6 +63,7 @@ class Plant {
       plantKey: plantKey ?? this.plantKey,
       showScheduleOnCalendar:
           showScheduleOnCalendar ?? this.showScheduleOnCalendar,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 
@@ -72,6 +78,7 @@ class Plant {
       'notes': notes,
       'plant_key': plantKey,
       'schedule_on_calendar': showScheduleOnCalendar ? 1 : 0,
+      'notifications_enabled': notificationsEnabled ? 1 : 0,
     };
   }
 
@@ -91,6 +98,8 @@ class Plant {
       plantKey: map['plant_key'] as String?,
       showScheduleOnCalendar:
           (map['schedule_on_calendar'] as int? ?? 0) == 1,
+      notificationsEnabled:
+          (map['notifications_enabled'] as int? ?? 1) == 1,
     );
   }
 }
