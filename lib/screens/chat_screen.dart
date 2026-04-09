@@ -356,7 +356,8 @@ class _ChatScreenState extends State<ChatScreen> {
           final id = await repo.insert(plant);
           await NotificationService.scheduleWateringReminder(
             plant.copyWith(id: id),
-            notifyHour: await _savedNotifyHour(),
+            notifyHour: (await _savedNotifyTime()).hour,
+            notifyMinute: (await _savedNotifyTime()).minute,
           );
           await _reloadPlants();
           _showCollectionChip('Added ${plant.name}');
@@ -378,7 +379,8 @@ class _ChatScreenState extends State<ChatScreen> {
           await repo.update(updated);
           await NotificationService.scheduleWateringReminder(
             updated,
-            notifyHour: await _savedNotifyHour(),
+            notifyHour: (await _savedNotifyTime()).hour,
+            notifyMinute: (await _savedNotifyTime()).minute,
           );
           await _reloadPlants();
           _showCollectionChip('Updated ${updated.name}');
@@ -419,7 +421,8 @@ class _ChatScreenState extends State<ChatScreen> {
             if (careType == CareType.watering) {
               await NotificationService.scheduleWateringReminder(
                 updated,
-                notifyHour: await _savedNotifyHour(),
+                notifyHour: (await _savedNotifyTime()).hour,
+            notifyMinute: (await _savedNotifyTime()).minute,
               );
             }
           }
@@ -504,9 +507,12 @@ class _ChatScreenState extends State<ChatScreen> {
         child: const Icon(Icons.eco, size: 18, color: AppColors.forest),
       );
 
-  Future<int> _savedNotifyHour() async {
+  Future<({int hour, int minute})> _savedNotifyTime() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('reminder_hour') ?? NotificationService.defaultNotifyHour;
+    return (
+      hour: prefs.getInt('reminder_hour') ?? NotificationService.defaultNotifyHour,
+      minute: prefs.getInt('reminder_minute') ?? NotificationService.defaultNotifyMinute,
+    );
   }
 
   void _showCollectionChip(String label) {
