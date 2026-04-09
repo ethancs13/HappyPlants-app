@@ -12,7 +12,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // TODO: wire to NotificationService once feature/notifications is merged into main.
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 9, minute: 0);
 
@@ -52,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.rescheduleAll(
         plants,
         notifyHour: _reminderTime.hour,
+        notifyMinute: _reminderTime.minute,
       );
     } else {
       await NotificationService.cancelAll();
@@ -75,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (_notificationsEnabled) {
       final plants = await PlantRepository.create().then((r) => r.getAll());
-      await NotificationService.rescheduleAll(plants, notifyHour: picked.hour);
+      await NotificationService.rescheduleAll(plants, notifyHour: picked.hour, notifyMinute: picked.minute);
     }
 
     if (!mounted) return;

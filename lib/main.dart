@@ -18,9 +18,11 @@ void main() async {
   if (notificationsEnabled) {
     final notifyHour =
         prefs.getInt('reminder_hour') ?? NotificationService.defaultNotifyHour;
+    final notifyMinute =
+        prefs.getInt('reminder_minute') ?? NotificationService.defaultNotifyMinute;
     final repo = await PlantRepository.create();
     final plants = await repo.getAll();
-    await NotificationService.rescheduleAll(plants, notifyHour: notifyHour);
+    await NotificationService.rescheduleAll(plants, notifyHour: notifyHour, notifyMinute: notifyMinute);
   }
 
   runApp(const HappyPlantsApp());

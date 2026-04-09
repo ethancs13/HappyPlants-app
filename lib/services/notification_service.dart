@@ -12,12 +12,12 @@ class NotificationService {
   static const _channelName = 'Watering Reminders';
   static const _channelDesc = 'Daily reminders when a plant needs watering';
 
-  // Custom sound — file must exist at android/app/src/main/res/raw/watering_reminder.mp3
+  // Custom sound — file must exist at android/app/src/main/res/raw/water_notification.mp3
   // and be added to ios/Runner in Xcode (Copy Bundle Resources) for iOS.
-  static const _sound = RawResourceAndroidNotificationSound('watering_reminder');
+  static const _sound = RawResourceAndroidNotificationSound('water_notification');
 
-  // Default hour of day to deliver watering reminders (9 AM local time)
   static const defaultNotifyHour = 9;
+  static const defaultNotifyMinute = 0;
 
   static Future<void> init() async {
     tz.initializeTimeZones();
@@ -47,13 +47,14 @@ class NotificationService {
   static Future<void> scheduleWateringReminder(
     Plant plant, {
     int notifyHour = defaultNotifyHour,
+    int notifyMinute = defaultNotifyMinute,
   }) async {
     final next = plant.nextWateringDate;
     if (next == null || plant.id == null || !plant.notificationsEnabled) return;
 
     // Build the target time in local time on the due date, then convert to UTC.
     // Dart's DateTime() (without .utc) reads the device's local timezone.
-    final localTime = DateTime(next.year, next.month, next.day, notifyHour, 0);
+    final localTime = DateTime(next.year, next.month, next.day, notifyHour, notifyMinute);
     final utcTime = localTime.toUtc();
 
     // TZDateTime.utc represents the exact moment; the device fires the
@@ -101,10 +102,11 @@ class NotificationService {
   static Future<void> rescheduleAll(
     List<Plant> plants, {
     int notifyHour = defaultNotifyHour,
+    int notifyMinute = defaultNotifyMinute,
   }) async {
     await _plugin.cancelAll();
     for (final plant in plants) {
-      await scheduleWateringReminder(plant, notifyHour: notifyHour);
+      await scheduleWateringReminder(plant, notifyHour: notifyHour, notifyMinute: notifyMinute);
     }
   }
 
