@@ -27,6 +27,52 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   bool get _isEditing => widget.plant != null;
 
+  bool get _hasUnsavedChanges {
+    if (!_isEditing) return false;
+    final p = widget.plant!;
+    return _nameController.text.trim() != p.name ||
+        _speciesController.text.trim() != p.species ||
+        _intervalController.text.trim() != p.wateringIntervalDays.toString() ||
+        _notesController.text.trim() != (p.notes ?? '') ||
+        _selectedPlantKey != p.plantKey;
+  }
+
+  Future<void> _handleBackPress() async {
+    if (!_hasUnsavedChanges) {
+      Navigator.pop(context);
+      return;
+    }
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        title: const Text(
+          'Unsaved changes',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'You have unsaved changes. Save before leaving?',
+          style: TextStyle(color: AppColors.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'discard'),
+            child: const Text('Discard',
+                style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'save'),
+            child: const Text('Save',
+                style: TextStyle(color: AppColors.darkOlive)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (result == 'discard') Navigator.pop(context);
+    if (result == 'save') await _save();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +111,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           plantKey: _selectedPlantKey,
         );
         await repo.update(updated);
+        await NotificationService.scheduleWateringReminder(updated);
         if (mounted) Navigator.pop(context, updated);
       } else {
         final newPlant = Plant(
@@ -88,94 +135,100 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _field(
-                        controller: _nameController,
-                        label: 'Plant name',
-                        hint: 'e.g. Living Room Monstera',
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 14),
-                      _field(
-                        controller: _speciesController,
-                        label: 'Species',
-                        hint: 'e.g. Monstera deliciosa',
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 14),
-                      _field(
-                        controller: _intervalController,
-                        label: 'Water every (days)',
-                        hint: 'e.g. 7',
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Required';
-                          final n = int.tryParse(v.trim());
-                          if (n == null || n < 1) return 'Enter a number >= 1';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      _field(
-                        controller: _notesController,
-                        label: 'Notes (optional)',
-                        hint: 'Care tips, location, etc.',
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 24),
-                      _sectionLabel('Choose an illustration (optional)'),
-                      const SizedBox(height: 10),
-                      PlantPicker(
-                        selectedKey: _selectedPlantKey,
-                        onSelected: (key) => setState(() {
-                          _selectedPlantKey =
-                              _selectedPlantKey == key ? null : key;
-                        }),
-                      ),
-                      const SizedBox(height: 28),
-                      SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _saving ? null : _save,
-                          child: _saving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.tan,
-                                  ),
-                                )
-                              : Text(_isEditing ? 'Save Changes' : 'Add Plant'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBackPress();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.cream,
+        body: SafeArea(
+          top: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _field(
+                          controller: _nameController,
+                          label: 'Plant name',
+                          hint: 'e.g. Living Room Monstera',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                        const SizedBox(height: 14),
+                        _field(
+                          controller: _speciesController,
+                          label: 'Species',
+                          hint: 'e.g. Monstera deliciosa',
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 14),
+                        _field(
+                          controller: _intervalController,
+                          label: 'Water every (days)',
+                          hint: 'e.g. 7',
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Required';
+                            final n = int.tryParse(v.trim());
+                            if (n == null || n < 1) return 'Enter a number >= 1';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        _field(
+                          controller: _notesController,
+                          label: 'Notes (optional)',
+                          hint: 'Care tips, location, etc.',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 24),
+                        _sectionLabel('Choose an illustration (optional)'),
+                        const SizedBox(height: 10),
+                        PlantPicker(
+                          selectedKey: _selectedPlantKey,
+                          onSelected: (key) => setState(() {
+                            _selectedPlantKey =
+                                _selectedPlantKey == key ? null : key;
+                          }),
+                        ),
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _saving ? null : _save,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.tan,
+                                    ),
+                                  )
+                                : Text(_isEditing ? 'Save Changes' : 'Add Plant'),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -194,7 +247,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: AppColors.tan),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _handleBackPress,
           ),
           const SizedBox(width: 4),
           Text(

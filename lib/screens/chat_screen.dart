@@ -13,7 +13,9 @@ import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/repositories/settings_repository.dart';
 import 'package:happy_plants/services/gemini_service.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Uint8List? _currentImageBytes;
 
   List<Plant> _allPlants = [];
+  Map<int, String> _coverPhotos = {};
   Plant? _contextPlant;
   String _botName = 'PlantBot';
 
@@ -84,6 +87,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final savedMessages = await chatRepo.getMessages();
     final savedHistory = await chatRepo.getGeminiHistory();
     final plants = await plantRepo.getAll();
+    final photoRepo = await PlantPhotoRepository.create();
+    final coverPhotos = await photoRepo.getCoverPhotoMap();
 
     final gemini = await GeminiService.create(
       plants: plants,
@@ -97,6 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _settingsRepo = settingsRepo;
       _botName = botName;
       _allPlants = plants;
+      _coverPhotos = coverPhotos;
       _gemini = gemini;
       _isLoading = false;
 
@@ -216,15 +222,18 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
                     ..._allPlants.map((p) => ListTile(
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.statusGreenBg,
-                            ),
-                            child: const Icon(Icons.eco,
-                                size: 18, color: AppColors.forest),
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _coverPhotos.containsKey(p.id)
+                                ? Image.file(
+                                    File(_coverPhotos[p.id]!),
+                                    width: 36,
+                                    height: 36,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, e, s) =>
+                                        _plantIconFallback(),
+                                  )
+                                : _plantIconFallback(),
                           ),
                           title: Text(p.name,
                               style: const TextStyle(
@@ -345,6 +354,10 @@ class _ChatScreenState extends State<ChatScreen> {
             plantKey: args['plant_key'] as String?,
           );
           final id = await repo.insert(plant);
+          await NotificationService.scheduleWateringReminder(
+            plant.copyWith(id: id),
+            notifyHour: await _savedNotifyHour(),
+          );
           await _reloadPlants();
           _showCollectionChip('Added ${plant.name}');
           return {'success': true, 'plant_id': id, 'name': plant.name};
@@ -363,6 +376,10 @@ class _ChatScreenState extends State<ChatScreen> {
             notes: args['notes'] as String?,
           );
           await repo.update(updated);
+          await NotificationService.scheduleWateringReminder(
+            updated,
+            notifyHour: await _savedNotifyHour(),
+          );
           await _reloadPlants();
           _showCollectionChip('Updated ${updated.name}');
           return {'success': true, 'name': updated.name};
@@ -376,6 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
           await logRepo.deleteByPlantId(plantId);
           await photoRepo.deleteByPlantId(plantId);
           await repo.delete(plantId);
+          await NotificationService.cancelReminder(plantId);
           await _reloadPlants();
           _showCollectionChip('Deleted ${plant?.name ?? 'plant'}');
           return {'success': true};
@@ -398,6 +416,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? plant.copyWith(lastWateredDate: DateTime.now())
                 : plant.copyWith(lastFertilizedDate: DateTime.now());
             await plantRepo.update(updated);
+            if (careType == CareType.watering) {
+              await NotificationService.scheduleWateringReminder(
+                updated,
+                notifyHour: await _savedNotifyHour(),
+              );
+            }
           }
           await _reloadPlants();
           _showCollectionChip(
@@ -460,9 +484,29 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _reloadPlants() async {
     final repo = await PlantRepository.create();
+    final photoRepo = await PlantPhotoRepository.create();
     final plants = await repo.getAll();
+    final coverPhotos = await photoRepo.getCoverPhotoMap();
     if (!mounted) return;
-    setState(() => _allPlants = plants);
+    setState(() {
+      _allPlants = plants;
+      _coverPhotos = coverPhotos;
+    });
+  }
+
+  Widget _plantIconFallback() => Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.statusGreenBg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.eco, size: 18, color: AppColors.forest),
+      );
+
+  Future<int> _savedNotifyHour() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('reminder_hour') ?? NotificationService.defaultNotifyHour;
   }
 
   void _showCollectionChip(String label) {

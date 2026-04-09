@@ -16,7 +16,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'happy_plants.db');
     return openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -33,7 +33,8 @@ class DatabaseHelper {
         last_fertilized_date TEXT,
         notes TEXT,
         plant_key TEXT,
-        schedule_on_calendar INTEGER NOT NULL DEFAULT 0
+        schedule_on_calendar INTEGER NOT NULL DEFAULT 0,
+        notifications_enabled INTEGER NOT NULL DEFAULT 1
       )
     ''');
 
@@ -105,15 +106,6 @@ class DatabaseHelper {
         )
       ''');
     }
-    if (oldVersion < 5) {
-      await db.execute('ALTER TABLE care_logs ADD COLUMN emoji TEXT');
-      await db.execute('ALTER TABLE care_logs ADD COLUMN color TEXT');
-    }
-    if (oldVersion < 6) {
-      await db.execute(
-        'ALTER TABLE plants ADD COLUMN schedule_on_calendar INTEGER NOT NULL DEFAULT 0',
-      );
-    }
     if (oldVersion < 4) {
       await db.execute('''
         CREATE TABLE settings (
@@ -137,6 +129,25 @@ class DatabaseHelper {
           parts TEXT NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE care_logs ADD COLUMN emoji TEXT');
+      await db.execute('ALTER TABLE care_logs ADD COLUMN color TEXT');
+    }
+    if (oldVersion < 6) {
+      // Guard against installs where the column was added outside a clean migration path.
+      final cols = await db.rawQuery('PRAGMA table_info(plants)');
+      final hasCol = cols.any((c) => c['name'] == 'schedule_on_calendar');
+      if (!hasCol) {
+        await db.execute(
+          'ALTER TABLE plants ADD COLUMN schedule_on_calendar INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+    }
+    if (oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE plants ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 1',
+      );
     }
   }
 

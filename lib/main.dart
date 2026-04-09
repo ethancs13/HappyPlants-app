@@ -6,15 +6,22 @@ import 'package:happy_plants/screens/home_screen.dart';
 import 'package:happy_plants/screens/plant_detail_screen.dart';
 import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
 
-  // Reschedule all notifications on every startup so they reflect current DB state
-  final repo = await PlantRepository.create();
-  final plants = await repo.getAll();
-  await NotificationService.rescheduleAll(plants);
+  // Reschedule all notifications on startup, respecting the user's saved settings.
+  final prefs = await SharedPreferences.getInstance();
+  final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+  if (notificationsEnabled) {
+    final notifyHour =
+        prefs.getInt('reminder_hour') ?? NotificationService.defaultNotifyHour;
+    final repo = await PlantRepository.create();
+    final plants = await repo.getAll();
+    await NotificationService.rescheduleAll(plants, notifyHour: notifyHour);
+  }
 
   runApp(const HappyPlantsApp());
 }
