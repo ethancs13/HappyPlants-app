@@ -70,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Plant> _allPlants = [];
   Map<int, String> _coverPhotos = {};
   Plant? _contextPlant;
-  String _botName = 'PlantBot';
+  String _botName = 'Mother Nature';
 
   @override
   void initState() {
@@ -375,6 +375,7 @@ class _ChatScreenState extends State<ChatScreen> {
             species: args['species'] as String?,
             wateringIntervalDays: args['watering_interval_days'] as int?,
             notes: args['notes'] as String?,
+            plantKey: args['plant_key'] as String?,
           );
           await repo.update(updated);
           await NotificationService.scheduleWateringReminder(
@@ -476,6 +477,87 @@ class _ChatScreenState extends State<ChatScreen> {
           final plant = await plantRepo.getById(plantId);
           _showCollectionChip('Photo saved to ${plant?.name ?? 'plant'}');
           return {'success': true, 'photo_id': photo.id};
+
+        case 'set_next_watering':
+          final plantId = args['plant_id'] as int;
+          final dateStr = args['next_watering_date'] as String;
+          final nextDate = DateTime.parse(dateStr);
+          final plantRepo = await PlantRepository.create();
+          final plant = await plantRepo.getById(plantId);
+          if (plant == null) {
+            return {'success': false, 'error': 'Plant not found'};
+          }
+          final anchor = nextDate.subtract(
+              Duration(days: plant.wateringIntervalDays));
+          final updated = plant.copyWith(lastWateredDate: anchor);
+          await plantRepo.update(updated);
+          final notifyTime = await _savedNotifyTime();
+          await NotificationService.scheduleWateringReminder(
+            updated,
+            notifyHour: notifyTime.hour,
+            notifyMinute: notifyTime.minute,
+          );
+          await _reloadPlants();
+          _showCollectionChip(
+              'Next watering for ${plant.name} set to $dateStr');
+          return {'success': true};
+
+        case 'toggle_calendar_schedule':
+          final plantId = args['plant_id'] as int;
+          final enabled = args['enabled'] as bool;
+          final plantRepo = await PlantRepository.create();
+          final plant = await plantRepo.getById(plantId);
+          if (plant == null) {
+            return {'success': false, 'error': 'Plant not found'};
+          }
+          final updated = plant.copyWith(showScheduleOnCalendar: enabled);
+          await plantRepo.update(updated);
+          await _reloadPlants();
+          _showCollectionChip(
+              '${plant.name} ${enabled ? 'shown on' : 'hidden from'} calendar');
+          return {'success': true};
+
+        case 'toggle_notifications':
+          final plantId = args['plant_id'] as int;
+          final enabled = args['enabled'] as bool;
+          final plantRepo = await PlantRepository.create();
+          final plant = await plantRepo.getById(plantId);
+          if (plant == null) {
+            return {'success': false, 'error': 'Plant not found'};
+          }
+          final updated = plant.copyWith(notificationsEnabled: enabled);
+          await plantRepo.update(updated);
+          if (enabled) {
+            final notifyTime = await _savedNotifyTime();
+            await NotificationService.scheduleWateringReminder(
+              updated,
+              notifyHour: notifyTime.hour,
+              notifyMinute: notifyTime.minute,
+            );
+          } else {
+            await NotificationService.cancelReminder(plantId);
+          }
+          await _reloadPlants();
+          _showCollectionChip(
+              'Notifications ${enabled ? 'enabled' : 'disabled'} for ${plant.name}');
+          return {'success': true};
+
+        case 'delete_photo':
+          final photoId = args['photo_id'] as int;
+          final photoRepo = await PlantPhotoRepository.create();
+          await photoRepo.delete(photoId);
+          _showCollectionChip('Photo deleted');
+          return {'success': true};
+
+        case 'set_cover_photo':
+          final photoId = args['photo_id'] as int;
+          final plantId = args['plant_id'] as int;
+          final photoRepo = await PlantPhotoRepository.create();
+          await photoRepo.setCover(plantId, photoId);
+          final plantRepo = await PlantRepository.create();
+          final plant = await plantRepo.getById(plantId);
+          _showCollectionChip('Cover photo updated for ${plant?.name ?? 'plant'}');
+          return {'success': true};
 
         default:
           return {'success': false, 'error': 'Unknown function: $name'};
