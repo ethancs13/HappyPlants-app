@@ -141,7 +141,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
       final picked = await showDatePicker(
         context: context,
         initialDate: DateTime.now().add(Duration(days: _plant.wateringIntervalDays)),
-        firstDate: DateTime.now(),
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
         lastDate: DateTime.now().add(const Duration(days: 365)),
         helpText: 'When should the first watering be?',
       );
