@@ -849,9 +849,8 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: widget.day,
-                      firstDate: DateTime.now(),
-                      lastDate:
-                          DateTime.now().add(const Duration(days: 365)),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
                       helpText: 'Move next watering to…',
                     );
                     if (picked != null) widget.onReschedule!(picked);

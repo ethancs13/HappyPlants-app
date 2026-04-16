@@ -636,7 +636,7 @@ class _DayPanelState extends State<_DayPanel> {
     final picked = await showDatePicker(
       context: context,
       initialDate: s.date,
-      firstDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       helpText: 'Move next watering to…',
     );
