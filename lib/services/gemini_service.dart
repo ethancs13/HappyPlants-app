@@ -80,6 +80,13 @@ class GeminiService {
               'species': {'type': 'STRING'},
               'watering_interval_days': {'type': 'INTEGER'},
               'notes': {'type': 'STRING'},
+              'plant_key': {
+                'type': 'STRING',
+                'description':
+                    'Change the animated illustration. '
+                    'Available keys: plant_01, plant_02, plant_03, plant_05, '
+                    'plant_07, plant_14, plant_15.',
+              },
             },
             'required': ['plant_id'],
           },
@@ -115,6 +122,95 @@ class GeminiService {
               },
             },
             'required': ['plant_id', 'type'],
+          },
+        },
+        {
+          'name': 'set_next_watering',
+          'description':
+              'Set the next watering date for a plant by adjusting its last watered date. '
+              'Use when the user says something like "water my plant on Friday", '
+              '"set next watering to June 10", or "I watered it last Tuesday". '
+              'Past dates are allowed — use them to record a recent watering and '
+              'let the interval compute the correct next date.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'plant_id': {
+                'type': 'INTEGER',
+                'description': 'ID of the plant.',
+              },
+              'next_watering_date': {
+                'type': 'STRING',
+                'description':
+                    'Desired next watering date in YYYY-MM-DD format. '
+                    'May be in the past to anchor the cycle from a recent watering.',
+              },
+            },
+            'required': ['plant_id', 'next_watering_date'],
+          },
+        },
+        {
+          'name': 'toggle_calendar_schedule',
+          'description':
+              'Show or hide a plant\'s projected watering schedule on the global calendar.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'plant_id': {'type': 'INTEGER'},
+              'enabled': {
+                'type': 'BOOLEAN',
+                'description': 'true to show on calendar, false to hide.',
+              },
+            },
+            'required': ['plant_id', 'enabled'],
+          },
+        },
+        {
+          'name': 'toggle_notifications',
+          'description':
+              'Enable or disable watering reminder notifications for a specific plant.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'plant_id': {'type': 'INTEGER'},
+              'enabled': {
+                'type': 'BOOLEAN',
+                'description': 'true to enable reminders, false to disable.',
+              },
+            },
+            'required': ['plant_id', 'enabled'],
+          },
+        },
+        {
+          'name': 'delete_photo',
+          'description': 'Delete a photo from a plant\'s photo journal.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'photo_id': {
+                'type': 'INTEGER',
+                'description': 'ID of the photo to delete.',
+              },
+            },
+            'required': ['photo_id'],
+          },
+        },
+        {
+          'name': 'set_cover_photo',
+          'description': 'Set an existing photo as the cover image for a plant.',
+          'parameters': {
+            'type': 'OBJECT',
+            'properties': {
+              'photo_id': {
+                'type': 'INTEGER',
+                'description': 'ID of the photo to set as cover.',
+              },
+              'plant_id': {
+                'type': 'INTEGER',
+                'description': 'ID of the plant this photo belongs to.',
+              },
+            },
+            'required': ['photo_id', 'plant_id'],
           },
         },
         {
@@ -157,7 +253,7 @@ class GeminiService {
 
   static Future<GeminiService> create({
     List<Plant> plants = const [],
-    String botName = 'PlantBot',
+    String botName = 'Mother Nature',
     List<Map<String, dynamic>> resumedHistory = const [],
   }) async {
     final model = await _detectModel();
