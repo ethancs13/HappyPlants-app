@@ -10,6 +10,7 @@ import 'package:happy_plants/repositories/care_log_repository.dart';
 import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/screens/add_plant_screen.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:happy_plants/widgets/plant_care_calendar.dart';
 import 'package:happy_plants/widgets/plant_widget.dart';
@@ -82,6 +83,9 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
         });
         _refreshLogs();
       }
+      if (type == CareType.watering) {
+        await NotificationService.scheduleWateringReminder(updated);
+      }
     } catch (_) {
       if (mounted) setState(() => _actionPending = false);
     }
@@ -118,6 +122,19 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     if (mounted) _refreshPhotos();
   }
 
+  Future<void> _toggleNotifications(bool value) async {
+    final updated = _plant.copyWith(notificationsEnabled: value);
+    final repo = await PlantRepository.create();
+    await repo.update(updated);
+    if (!mounted) return;
+    setState(() => _plant = updated);
+    if (value) {
+      await NotificationService.scheduleWateringReminder(updated);
+    } else {
+      await NotificationService.cancelReminder(_plant.id!);
+    }
+  }
+
   Future<void> _toggleScheduleOnCalendar(bool value) async {
     var updated = _plant.copyWith(showScheduleOnCalendar: value);
     if (value && _plant.lastWateredDate == null) {
@@ -148,6 +165,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final repo = await PlantRepository.create();
     await repo.update(updated);
     if (mounted) setState(() => _plant = updated);
+    await NotificationService.scheduleWateringReminder(updated);
   }
 
   Future<void> _showAddPhotoSheet() async {
@@ -278,6 +296,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     await logRepo.deleteByPlantId(_plant.id!);
     await photoRepo.deleteByPlantId(_plant.id!);
     await plantRepo.delete(_plant.id!);
+    await NotificationService.cancelReminder(_plant.id!);
 
     if (mounted) Navigator.pop(context, true);
   }
@@ -436,6 +455,18 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         child: Text('Care Schedule',
                             style: Theme.of(context).textTheme.titleMedium),
                       ),
+                      const Icon(Icons.notifications_outlined,
+                          size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      Switch(
+                        value: _plant.notificationsEnabled,
+                        onChanged: _toggleNotifications,
+                        activeThumbColor: AppColors.darkOlive,
+                        activeTrackColor: AppColors.olive,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
                       const Icon(Icons.calendar_month,
                           size: 16, color: AppColors.textMuted),
                       const SizedBox(width: 4),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:happy_plants/repositories/plant_repository.dart';
+import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +12,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // TODO: wire to NotificationService once feature/notifications is merged into main.
   bool _notificationsEnabled = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 9, minute: 0);
 
@@ -42,11 +43,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _setNotificationsEnabled(bool value) async {
+    setState(() => _notificationsEnabled = value);
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_notificationsEnabledKey, value);
 
-    if (!mounted) return;
-    setState(() => _notificationsEnabled = value);
+    if (value) {
+      final plants = await PlantRepository.create().then((r) => r.getAll());
+      await NotificationService.rescheduleAll(
+        plants,
+        notifyHour: _reminderTime.hour,
+        notifyMinute: _reminderTime.minute,
+      );
+    } else {
+      await NotificationService.cancelAll();
+    }
   }
 
   Future<void> _pickReminderTime() async {
@@ -61,18 +72,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setInt(_reminderHourKey, picked.hour);
     await prefs.setInt(_reminderMinuteKey, picked.minute);
 
+    if (_notificationsEnabled) {
+      final plants = await PlantRepository.create().then((r) => r.getAll());
+      await NotificationService.rescheduleAll(plants, notifyHour: picked.hour, notifyMinute: picked.minute);
+    }
+
     if (!mounted) return;
     setState(() => _reminderTime = picked);
   }
 
-  void _sendTestNotification() {
-    // TODO: replace with NotificationService.sendTest() after merge
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Notifications coming soon — wire up after merge.'),
-        duration: Duration(seconds: 3),
-      ),
-    );
+  Future<void> _sendTestNotification() async {
+    await NotificationService.sendTestNotification();
   }
 
   @override

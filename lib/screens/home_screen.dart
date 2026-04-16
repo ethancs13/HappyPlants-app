@@ -112,19 +112,20 @@ class _PlantsTabState extends State<_PlantsTab> {
 
   void _refresh() => setState(_load);
 
-  void _openChat() {
+  Future<void> _openChat() async {
     final box =
         _chatBubbleKey.currentContext?.findRenderObject() as RenderBox?;
     final center = box != null
         ? box.localToGlobal(Offset(box.size.width / 2, box.size.height / 2))
         : Offset(44, MediaQuery.of(context).size.height - 100);
 
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       CircularRevealRoute<void>(
         page: const ChatScreen(),
         center: center,
       ),
     );
+    _refresh();
   }
 
   Future<void> _openDetail(Plant plant) async {
@@ -253,42 +254,43 @@ class _AIChatBubble extends StatefulWidget {
 class _AIChatBubbleState extends State<_AIChatBubble>
     with TickerProviderStateMixin {
   late final List<AnimationController> _rings;
-  late final AnimationController _wavePhase;
   late final AnimationController _breathe;
   late final Animation<double> _breatheScale;
+
+  void _startRing(int i) {
+    _rings[i]
+      ..reset()
+      ..forward().then((_) {
+        if (mounted) _startRing(i);
+      });
+  }
 
   @override
   void initState() {
     super.initState();
 
-    // 3 staggered expanding rings — slow, earthy spread
+    // 3 staggered expanding rings
     _rings = List.generate(
       3,
       (_) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 16000),
+        duration: const Duration(milliseconds: 11000),
       ),
     );
-    _rings[0].repeat();
-    Future.delayed(const Duration(milliseconds: 6000), () {
-      if (mounted) _rings[1].repeat();
+    _startRing(0);
+    Future.delayed(const Duration(milliseconds: 3700), () {
+      if (mounted) _startRing(1);
     });
-    Future.delayed(const Duration(milliseconds: 11000), () {
-      if (mounted) _rings[2].repeat();
+    Future.delayed(const Duration(milliseconds: 7400), () {
+      if (mounted) _startRing(2);
     });
 
-    // Slow wave rotation for the organic wobble
-    _wavePhase = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 11000),
-    )..repeat();
-
-    // Subtle breathe on the main button
+    // Breathe on the main button
     _breathe = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 11000),
+      duration: const Duration(milliseconds: 5000),
     )..repeat(reverse: true);
-    _breatheScale = Tween<double>(begin: 1.0, end: 1.06).animate(
+    _breatheScale = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _breathe, curve: Curves.easeInOut),
     );
   }
@@ -298,7 +300,6 @@ class _AIChatBubbleState extends State<_AIChatBubble>
     for (final c in _rings) {
       c.dispose();
     }
-    _wavePhase.dispose();
     _breathe.dispose();
     super.dispose();
   }
@@ -313,17 +314,15 @@ class _AIChatBubbleState extends State<_AIChatBubble>
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Wavy expanding rings
+            // Expanding rings
             for (int i = 0; i < 3; i++)
               AnimatedBuilder(
-                animation: Listenable.merge([_rings[i], _wavePhase]),
+                animation: _rings[i],
                 builder: (_, _) => CustomPaint(
                   size: const Size(100, 100),
-                  painter: _WavyRingPainter(
+                  painter: _RingPainter(
                     progress: _rings[i].value,
-                    wavePhase: _wavePhase.value * 2 * pi,
                     color: AppColors.forest,
-                    baseRadius: 28,
                   ),
                 ),
               ),
@@ -356,58 +355,34 @@ class _AIChatBubbleState extends State<_AIChatBubble>
   }
 }
 
-class _WavyRingPainter extends CustomPainter {
+class _RingPainter extends CustomPainter {
   final double progress;
-  final double wavePhase;
   final Color color;
-  final double baseRadius;
 
-  const _WavyRingPainter({
-    required this.progress,
-    required this.wavePhase,
-    required this.color,
-    required this.baseRadius,
-  });
+  const _RingPainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (progress <= 0) return;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = baseRadius + progress * baseRadius * 1.1;
-    // Waves are most pronounced at the start, fade as ring expands
-    final waveAmp = 2.5 * (1 - progress);
-    // Fade out quickly — squared curve so opacity drops off fast early
-    final opacity = 0.18 * pow(1 - progress, 2.5);
+    // Start inside the button (radius 18) so ring slides out from behind it
+    final radius = 18.0 + progress * 32.0;
+    final fadeIn = (progress / 0.10).clamp(0.0, 1.0);
+    final opacity = fadeIn * 0.32 * pow(1 - progress, 2.0);
     if (opacity <= 0.005) return;
 
-    final paint = Paint()
-      ..color = color.withValues(alpha: opacity.toDouble())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 + 0.8 * (1 - progress);
-
-    const segments = 72;
-    final path = Path();
-    for (int i = 0; i <= segments; i++) {
-      final angle = 2 * pi * i / segments;
-      // Two overlapping sin waves at different frequencies for organic feel
-      final wave = waveAmp * sin(wavePhase + angle * 5) +
-          waveAmp * 0.4 * sin(wavePhase * 1.3 + angle * 8);
-      final r = radius + wave;
-      final x = center.dx + r * cos(angle);
-      final y = center.dy + r * sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color.withValues(alpha: opacity.toDouble())
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8 + 1.2 * (1 - progress),
+    );
   }
 
   @override
-  bool shouldRepaint(_WavyRingPainter old) =>
-      old.progress != progress || old.wavePhase != wavePhase;
+  bool shouldRepaint(_RingPainter old) => old.progress != progress;
 }
 
 // ── Plant list ────────────────────────────────────────────────────────────────
