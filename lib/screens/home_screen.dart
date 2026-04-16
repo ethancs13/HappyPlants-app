@@ -18,15 +18,45 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin {
   int _tab = 0;
   final _plantsTabKey = GlobalKey<_PlantsTabState>();
   final _calendarKey = GlobalKey<CalendarScreenState>();
+  late final List<AnimationController> _hopControllers;
+  late final List<Animation<double>> _hopAnims;
+
+  @override
+  void initState() {
+    super.initState();
+    _hopControllers = List.generate(
+      2,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 300),
+      ),
+    );
+    _hopAnims = _hopControllers.map((c) {
+      return TweenSequence<double>([
+        TweenSequenceItem(tween: Tween(begin: 0, end: -7), weight: 40),
+        TweenSequenceItem(tween: Tween(begin: -7, end: 2), weight: 30),
+        TweenSequenceItem(tween: Tween(begin: 2, end: 0), weight: 30),
+      ]).animate(CurvedAnimation(parent: c, curve: Curves.easeOut));
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _hopControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   void _onTabTap(int i) {
     setState(() => _tab = i);
+    _hopControllers[i].forward(from: 0);
     if (i == 1) {
-      // Reload calendar data whenever the tab is activated
       _calendarKey.currentState?.reload();
     }
   }
@@ -44,24 +74,44 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Icon(Icons.add, size: 28),
             )
           : null,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: _onTabTap,
-        backgroundColor: AppColors.darkOlive,
-        selectedItemColor: AppColors.tan,
-        unselectedItemColor: AppColors.tan.withValues(alpha: 0.45),
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_florist),
-            label: 'Plants',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Calendar',
-          ),
-        ],
+      bottomNavigationBar: Theme(
+        data: Theme.of(context).copyWith(
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _tab,
+          onTap: _onTabTap,
+          backgroundColor: AppColors.darkOlive,
+          selectedItemColor: AppColors.tan,
+          unselectedItemColor: AppColors.tan.withValues(alpha: 0.45),
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          items: [
+            BottomNavigationBarItem(
+              icon: AnimatedBuilder(
+                animation: _hopAnims[0],
+                builder: (_, child) => Transform.translate(
+                  offset: Offset(0, _hopAnims[0].value),
+                  child: child,
+                ),
+                child: const Icon(Icons.local_florist),
+              ),
+              label: 'Plants',
+            ),
+            BottomNavigationBarItem(
+              icon: AnimatedBuilder(
+                animation: _hopAnims[1],
+                builder: (_, child) => Transform.translate(
+                  offset: Offset(0, _hopAnims[1].value),
+                  child: child,
+                ),
+                child: const Icon(Icons.calendar_month),
+              ),
+              label: 'Calendar',
+            ),
+          ],
+        ),
       ),
       body: IndexedStack(
         index: _tab,
