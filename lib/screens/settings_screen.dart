@@ -43,6 +43,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _setNotificationsEnabled(bool value) async {
+    setState(() => _notificationsEnabled = value);
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_notificationsEnabledKey, value);
 
@@ -56,9 +58,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       await NotificationService.cancelAll();
     }
-
-    if (!mounted) return;
-    setState(() => _notificationsEnabled = value);
   }
 
   Future<void> _pickReminderTime() async {
