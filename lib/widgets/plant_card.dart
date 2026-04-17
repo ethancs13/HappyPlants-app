@@ -64,7 +64,7 @@ class PlantCard extends StatelessWidget {
               Container(
                 width: 92,
                 height: double.infinity,
-                color: AppColors.potRim,
+                color: context.col.plantSlotBg,
                 child: Center(
                   child: PlantWidget(
                     isHappy: !overdue,

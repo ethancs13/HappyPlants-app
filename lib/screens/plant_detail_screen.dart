@@ -544,7 +544,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     }
 
     return Container(
-      color: AppColors.brown,
+      color: context.col.plantSlotBg,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 16,
         left: 8,
