@@ -178,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_allPlants.isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.col.bg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -191,18 +191,18 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.divider,
+                color: context.col.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 'Select a plant for context',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: context.col.textPrimary,
                 ),
               ),
             ),
@@ -213,8 +213,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     if (_contextPlant != null)
                       ListTile(
-                        leading: const Icon(Icons.cancel_outlined,
-                            color: AppColors.textMuted),
+                        leading: Icon(Icons.cancel_outlined,
+                            color: context.col.textMuted),
                         title: const Text('Remove plant context'),
                         onTap: () {
                           Navigator.pop(context);
@@ -583,7 +583,7 @@ class _ChatScreenState extends State<ChatScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppColors.statusGreenBg,
+          color: context.col.statusGreenBg,
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Icon(Icons.eco, size: 18, color: AppColors.forest),
@@ -689,7 +689,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _showImagePicker() async {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.col.bg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -704,7 +704,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.divider,
+                  color: context.col.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -713,7 +713,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.statusGreenBg,
+                    color: context.col.statusGreenBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.photo_library_outlined,
@@ -730,7 +730,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.statusGreenBg,
+                    color: context.col.statusGreenBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.camera_alt_outlined,
@@ -766,7 +766,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: context.col.bg,
       body: Column(
         children: [
           _buildHeader(context),
@@ -784,7 +784,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return GestureDetector(
       onTap: hasPlants ? _showPlantPicker : null,
       child: Container(
-        color: AppColors.cardBg,
+        color: context.col.card,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
@@ -793,7 +793,7 @@ class _ChatScreenState extends State<ChatScreen> {
               size: 15,
               color: _contextPlant != null
                   ? AppColors.forest
-                  : AppColors.textMuted,
+                  : context.col.textMuted,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -808,12 +808,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   fontWeight: FontWeight.w600,
                   color: _contextPlant != null
                       ? AppColors.forest
-                      : AppColors.textMuted,
+                      : context.col.textMuted,
                 ),
               ),
             ),
             if (hasPlants)
-              Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
+              Icon(Icons.chevron_right, size: 16, color: context.col.textMuted),
           ],
         ),
       ),
@@ -922,7 +922,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildImagePreview() {
     return Container(
-      color: Colors.white,
+      color: context.col.card,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
         children: [
@@ -940,14 +940,14 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Text(
               'Image ready to send',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: context.col.textMuted,
                 fontSize: 13,
               ),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),
-            color: AppColors.textMuted,
+            color: context.col.textMuted,
             onPressed: () => setState(() => _pendingImage = null),
           ),
         ],
@@ -957,7 +957,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInputBar() {
     return Container(
-      color: Colors.white,
+      color: context.col.card,
       padding: EdgeInsets.only(
         left: 12,
         right: 12,
@@ -969,7 +969,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _IconBtn(
             icon: Icons.add_photo_alternate_outlined,
             onTap: _showImagePicker,
-            color: AppColors.textMuted,
+            color: context.col.textMuted,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -979,20 +979,20 @@ class _ChatScreenState extends State<ChatScreen> {
               maxLines: 4,
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textPrimary,
+                color: context.col.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: _gemini == null
                     ? 'Connecting to $_botName...'
                     : 'Ask about your plants…',
-                hintStyle: const TextStyle(
-                  color: AppColors.textMuted,
+                hintStyle: TextStyle(
+                  color: context.col.textMuted,
                   fontSize: 14,
                 ),
                 filled: true,
-                fillColor: AppColors.cardBg,
+                fillColor: context.col.card,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
@@ -1033,19 +1033,19 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (message.isContext) return _contextCard();
+    if (message.isContext) return _contextCard(context);
     if (message.isUser) return _userBubble();
-    return _aiBubble();
+    return _aiBubble(context);
   }
 
-  Widget _contextCard() {
+  Widget _contextCard(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: AppColors.statusGreenBg,
+            color: context.col.statusGreenBg,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -1121,7 +1121,7 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _aiBubble() {
+  Widget _aiBubble(BuildContext context) {
     final isEmpty = message.text.isEmpty && !isStreaming;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1145,7 +1145,7 @@ class _MessageBubble extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.col.card,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(4),
                   topRight: Radius.circular(18),
@@ -1164,8 +1164,8 @@ class _MessageBubble extends StatelessWidget {
                   ? const _TypingDots()
                   : Text(
                       isStreaming ? '${message.text}▌' : message.text,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: context.col.textPrimary,
                         fontSize: 14,
                         height: 1.5,
                       ),
@@ -1240,7 +1240,7 @@ class _TypingDotsState extends State<_TypingDots>
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.textMuted.withValues(alpha: 0.6),
+                  color: context.col.textMuted.withValues(alpha: 0.6),
                 ),
               ),
             ),
@@ -1273,7 +1273,7 @@ class _IconBtn extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.cardBg,
+          color: context.col.card,
         ),
         child: Icon(icon, color: color, size: 22),
       ),
@@ -1297,7 +1297,7 @@ class _SendButton extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: active ? AppColors.forest : AppColors.divider,
+          color: active ? AppColors.forest : context.col.divider,
         ),
         child: const Icon(Icons.arrow_upward_rounded,
             color: Colors.white, size: 20),
