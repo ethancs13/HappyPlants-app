@@ -189,7 +189,7 @@ class CalendarScreenState extends State<CalendarScreen> {
         else ...[
           // Grid takes its natural height (no Expanded)
           _buildMonthGrid(),
-          const Divider(height: 1, color: AppColors.divider),
+          Divider(height: 1, color: context.col.divider),
           // Panel fills remaining space
           Expanded(child: _buildDayPanel()),
         ],
@@ -298,13 +298,13 @@ class CalendarScreenState extends State<CalendarScreen> {
                 if (dayNum < 1 || dayNum > daysInMonth) {
                   return Expanded(
                     child: Container(
-                      decoration: const BoxDecoration(
-                        color: AppColors.cream,
+                      decoration: BoxDecoration(
+                        color: context.col.bg,
                         border: Border(
                           right: BorderSide(
-                              color: AppColors.divider, width: 0.5),
+                              color: context.col.divider, width: 0.5),
                           bottom: BorderSide(
-                              color: AppColors.divider, width: 0.5),
+                              color: context.col.divider, width: 0.5),
                         ),
                       ),
                     ),
@@ -345,16 +345,16 @@ class CalendarScreenState extends State<CalendarScreen> {
   Widget _buildDayPanel() {
     final sel = _selectedDate;
     if (sel == null) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.touch_app_outlined,
-                size: 32, color: AppColors.divider),
-            SizedBox(height: 8),
+                size: 32, color: context.col.divider),
+            const SizedBox(height: 8),
             Text(
               'Tap a day to see events',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+              style: TextStyle(color: context.col.textMuted, fontSize: 14),
             ),
           ],
         ),
@@ -424,10 +424,10 @@ class _DayCell extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.darkOlive.withValues(alpha: 0.07)
-              : AppColors.cream,
+              : context.col.bg,
           border: Border(
-            right: const BorderSide(color: AppColors.divider, width: 0.5),
-            bottom: const BorderSide(color: AppColors.divider, width: 0.5),
+            right: BorderSide(color: context.col.divider, width: 0.5),
+            bottom: BorderSide(color: context.col.divider, width: 0.5),
             top: isSelected
                 ? const BorderSide(color: AppColors.darkOlive, width: 1.5)
                 : BorderSide.none,
@@ -454,7 +454,7 @@ class _DayCell extends StatelessWidget {
                     fontSize: 12,
                     fontWeight:
                         isToday ? FontWeight.w700 : FontWeight.w400,
-                    color: isToday ? Colors.white : AppColors.textPrimary,
+                    color: isToday ? Colors.white : context.col.textPrimary,
                   ),
                 ),
               ),
@@ -470,7 +470,7 @@ class _DayCell extends StatelessWidget {
                   dashed: false);
             }),
             if (eventOverflow > 0)
-              _overflowChip('+$eventOverflow'),
+              _overflowChip('+$eventOverflow', context),
             // Scheduled (projected) events — dashed green border
             ...List.generate(visibleSched.length, (i) {
               final s = visibleSched[i];
@@ -478,16 +478,16 @@ class _DayCell extends StatelessWidget {
                   dashed: true);
             }),
             if (schedOverflow > 0)
-              _overflowChip('+$schedOverflow sched'),
+              _overflowChip('+$schedOverflow sched', context),
             // Photo thumbnails
-            if (photoEvents.isNotEmpty) _photoStrip(),
+            if (photoEvents.isNotEmpty) _photoStrip(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _photoStrip() {
+  Widget _photoStrip(BuildContext context) {
     final visible = photoEvents.length > 3 ? photoEvents.sublist(0, 3) : photoEvents;
     final overflow = photoEvents.length > 3 ? photoEvents.length - 3 : 0;
     return Padding(
@@ -508,10 +508,10 @@ class _DayCell extends StatelessWidget {
                   child: Image.file(
                     File(e.photo.filePath),
                     fit: BoxFit.cover,
-                    errorBuilder: (_, e, s) => const Icon(
+                    errorBuilder: (_, e, s) => Icon(
                       Icons.photo_camera,
                       size: 8,
-                      color: AppColors.textMuted,
+                      color: context.col.textMuted,
                     ),
                   ),
                 ),
@@ -519,9 +519,9 @@ class _DayCell extends StatelessWidget {
           if (overflow > 0)
             Text(
               '+$overflow',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 7,
-                color: AppColors.textMuted,
+                color: context.col.textMuted,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -569,17 +569,17 @@ class _DayCell extends StatelessWidget {
     );
   }
 
-  Widget _overflowChip(String label) {
+  Widget _overflowChip(String label, BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
-        color: AppColors.divider,
+        color: context.col.divider,
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 8, color: AppColors.textMuted),
+        style: TextStyle(fontSize: 8, color: context.col.textMuted),
       ),
     );
   }
@@ -685,18 +685,18 @@ class _DayPanelState extends State<_DayPanel> {
           child: Text(
             _formatDate(widget.date),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.textPrimary,
+                  color: context.col.textPrimary,
                   fontWeight: FontWeight.w700,
                 ),
           ),
         ),
-        const Divider(height: 1, color: AppColors.divider),
+        Divider(height: 1, color: context.col.divider),
         if (!hasAny)
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'No events on this day',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                style: TextStyle(color: context.col.textMuted, fontSize: 14),
               ),
             ),
           )
@@ -714,19 +714,19 @@ class _DayPanelState extends State<_DayPanel> {
                           onEdit: () => _edit(e),
                           onDelete: () => _delete(e),
                         ),
-                        const Divider(height: 1, color: AppColors.divider),
+                        Divider(height: 1, color: context.col.divider),
                       ],
                     )),
                 if (scheduled.isNotEmpty) ...[
                   if (events.isNotEmpty) const SizedBox(height: 4),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
                     child: Text(
                       'SCHEDULED',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted,
+                        color: context.col.textMuted,
                         letterSpacing: 0.8,
                       ),
                     ),
@@ -739,14 +739,14 @@ class _DayPanelState extends State<_DayPanel> {
                 if (photos.isNotEmpty) ...[
                   if (events.isNotEmpty || scheduled.isNotEmpty)
                     const SizedBox(height: 4),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 6, 16, 4),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
                     child: Text(
                       'PHOTOS',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textMuted,
+                        color: context.col.textMuted,
                         letterSpacing: 0.8,
                       ),
                     ),
@@ -774,9 +774,9 @@ class _DayPanelState extends State<_DayPanel> {
                                   errorBuilder: (_, err, s) => Container(
                                     width: 80,
                                     height: 80,
-                                    color: AppColors.divider,
-                                    child: const Icon(Icons.broken_image,
-                                        size: 28, color: AppColors.textMuted),
+                                    color: context.col.divider,
+                                    child: Icon(Icons.broken_image,
+                                        size: 28, color: context.col.textMuted),
                                   ),
                                 ),
                               ),
@@ -785,9 +785,9 @@ class _DayPanelState extends State<_DayPanel> {
                                 width: 80,
                                 child: Text(
                                   e.plant.name,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 10,
-                                    color: AppColors.textMuted,
+                                    color: context.col.textMuted,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
@@ -855,17 +855,17 @@ class _EventTile extends StatelessWidget {
                 children: [
                   Text(
                     event.plant.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.col.textPrimary,
                     ),
                   ),
                   Text(
                     '$typeLabel · $timeStr',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textMuted,
+                      color: context.col.textMuted,
                     ),
                   ),
                   if (log.notes != null &&
@@ -874,9 +874,9 @@ class _EventTile extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 3),
                       child: Text(
                         log.notes!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: context.col.textMuted,
                           fontStyle: FontStyle.italic,
                         ),
                         maxLines: 2,
@@ -888,7 +888,7 @@ class _EventTile extends StatelessWidget {
             ),
             IconButton(
               icon: const Icon(Icons.edit_outlined, size: 18),
-              color: AppColors.textMuted,
+              color: context.col.textMuted,
               onPressed: onEdit,
               tooltip: 'Edit',
             ),
@@ -940,17 +940,17 @@ class _ScheduledEventTile extends StatelessWidget {
                 children: [
                   Text(
                     scheduled.plant.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.col.textPrimary,
                     ),
                   ),
-                  const Text(
+                  Text(
                     'Scheduled watering',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textMuted,
+                      color: context.col.textMuted,
                     ),
                   ),
                 ],
@@ -1024,11 +1024,11 @@ class _EditLogDialogState extends State<_EditLogDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.cream,
-      title: const Text(
+      backgroundColor: context.col.bg,
+      title: Text(
         'Edit Log',
         style: TextStyle(
-            color: AppColors.textPrimary, fontSize: 18),
+            color: context.col.textPrimary, fontSize: 18),
       ),
       contentPadding:
           const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -1074,7 +1074,7 @@ class _EditLogDialogState extends State<_EditLogDialog> {
                       border: Border.all(
                         color: sel
                             ? AppColors.darkOlive
-                            : AppColors.divider,
+                            : context.col.divider,
                         width: sel ? 2 : 1,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -1111,7 +1111,7 @@ class _EditLogDialogState extends State<_EditLogDialog> {
                       color: c,
                       border: sel
                           ? Border.all(
-                              color: AppColors.textPrimary,
+                              color: context.col.textPrimary,
                               width: 2.5)
                           : Border.all(
                               color: Colors.transparent,
@@ -1131,23 +1131,23 @@ class _EditLogDialogState extends State<_EditLogDialog> {
             TextField(
               controller: _notes,
               maxLines: 2,
-              style: const TextStyle(
-                  fontSize: 14, color: AppColors.textPrimary),
+              style: TextStyle(
+                  fontSize: 14, color: context.col.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Optional notes…',
-                hintStyle: const TextStyle(
-                    color: AppColors.textMuted),
+                hintStyle: TextStyle(
+                    color: context.col.textMuted),
                 filled: true,
-                fillColor: AppColors.cardBg,
+                fillColor: context.col.card,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                      color: AppColors.divider),
+                  borderSide: BorderSide(
+                      color: context.col.divider),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                      color: AppColors.divider),
+                  borderSide: BorderSide(
+                      color: context.col.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1164,8 +1164,8 @@ class _EditLogDialogState extends State<_EditLogDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel',
-              style: TextStyle(color: AppColors.textMuted)),
+          child: Text('Cancel',
+              style: TextStyle(color: context.col.textMuted)),
         ),
         ElevatedButton(
           onPressed: () {
@@ -1206,10 +1206,10 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMuted,
+        color: context.col.textMuted,
         letterSpacing: 0.5,
       ),
     );
@@ -1237,12 +1237,12 @@ class _TypeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppColors.darkOlive
-              : AppColors.cardBg,
+              : context.col.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected
                 ? AppColors.darkOlive
-                : AppColors.divider,
+                : context.col.divider,
           ),
         ),
         child: Text(
@@ -1251,7 +1251,7 @@ class _TypeChip extends StatelessWidget {
             fontSize: 13,
             color: selected
                 ? AppColors.tan
-                : AppColors.textPrimary,
+                : context.col.textPrimary,
             fontWeight: FontWeight.w500,
           ),
         ),

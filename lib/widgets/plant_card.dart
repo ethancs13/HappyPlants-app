@@ -44,7 +44,7 @@ class PlantCard extends StatelessWidget {
       child: Container(
         height: 124,
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: context.col.card,
           borderRadius: BorderRadius.circular(16),
         ),
         clipBehavior: Clip.hardEdge,
@@ -130,7 +130,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: overdue ? AppColors.statusRedBg : AppColors.statusGreenBg,
+        color: overdue ? context.col.statusRedBg : context.col.statusGreenBg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
