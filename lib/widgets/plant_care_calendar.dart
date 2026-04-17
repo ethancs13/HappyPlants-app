@@ -183,17 +183,17 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                 // Care row icon
                 SizedBox(
                   height: _rowH,
-                  child: const Center(
+                  child: Center(
                     child: Icon(Icons.eco,
-                        size: 14, color: AppColors.textMuted),
+                        size: 14, color: context.col.textMuted),
                   ),
                 ),
                 // Photo row icon
                 SizedBox(
                   height: _rowH,
-                  child: const Center(
+                  child: Center(
                     child: Icon(Icons.photo_camera,
-                        size: 14, color: AppColors.textMuted),
+                        size: 14, color: context.col.textMuted),
                   ),
                 ),
               ],
@@ -400,7 +400,7 @@ class _DayHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: isToday ? AppColors.darkOlive : AppColors.textMuted,
+              color: isToday ? AppColors.darkOlive : context.col.textMuted,
             ),
           ),
           const SizedBox(height: 2),
@@ -417,7 +417,7 @@ class _DayHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isToday ? Colors.white : AppColors.textPrimary,
+                  color: isToday ? Colors.white : context.col.textPrimary,
                 ),
               ),
             ),
@@ -499,7 +499,7 @@ class _CalendarCell extends StatelessWidget {
             border: border,
           ),
           child: hasLog
-              ? _logContent(last!)
+              ? _logContent(last!, context)
               : isScheduled
                   ? const Center(
                       child: Icon(Icons.water_drop,
@@ -511,7 +511,7 @@ class _CalendarCell extends StatelessWidget {
     );
   }
 
-  Widget _logContent(CareLog log) {
+  Widget _logContent(CareLog log, BuildContext context) {
     Widget icon;
     if (log.emoji != null && log.emoji!.isNotEmpty) {
       icon = Text(log.emoji!, style: const TextStyle(fontSize: 18));
@@ -534,10 +534,10 @@ class _CalendarCell extends StatelessWidget {
           right: 3,
           child: Text(
             '+${logs.length - 1}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 8,
               fontWeight: FontWeight.w800,
-              color: AppColors.textMuted,
+              color: context.col.textMuted,
             ),
           ),
         ),
@@ -593,10 +593,10 @@ class _PhotoCell extends StatelessWidget {
           child: Image.file(
             File(first.filePath),
             fit: BoxFit.cover,
-            errorBuilder: (_, e, s) => const Icon(
+            errorBuilder: (ctx, e, s) => Icon(
               Icons.broken_image,
               size: 16,
-              color: AppColors.textMuted,
+              color: ctx.col.textMuted,
             ),
           ),
         ),
@@ -768,7 +768,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _handle(),
+            _handle(context),
             Text(_label(), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
             // Existing logs with delete
@@ -840,8 +840,8 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                   icon: const Icon(Icons.calendar_month, size: 16),
                   label: const Text('Reschedule cycle'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textMuted,
-                    side: const BorderSide(color: AppColors.divider),
+                    foregroundColor: context.col.textMuted,
+                    side: BorderSide(color: context.col.divider),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onPressed: () async {
@@ -960,7 +960,7 @@ class _CustomLogSheetState extends State<_CustomLogSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: _handle()),
+              Center(child: _handle(context)),
               Text('Custom entry',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
@@ -1178,12 +1178,12 @@ class _RadialMenuState extends State<_RadialMenu>
 
 // ── Reusable small widgets ────────────────────────────────────────────────────
 
-Widget _handle() => Container(
+Widget _handle(BuildContext context) => Container(
       width: 36,
       height: 4,
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppColors.divider,
+        color: context.col.divider,
         borderRadius: BorderRadius.circular(2),
       ),
     );
@@ -1286,16 +1286,16 @@ class _TypeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.15) : AppColors.cardBg,
+          color: selected ? color.withValues(alpha: 0.15) : context.col.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: selected ? color : AppColors.divider,
+              color: selected ? color : context.col.divider,
               width: selected ? 2 : 1),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? color : AppColors.textMuted,
+            color: selected ? color : context.col.textMuted,
             fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
             fontSize: 13,
           ),
@@ -1322,16 +1322,15 @@ class _EmojiOption extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color:
-              selected ? AppColors.statusGreenBg : AppColors.cardBg,
+              selected ? context.col.statusGreenBg : context.col.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: selected ? AppColors.forest : AppColors.divider),
+              color: selected ? AppColors.forest : context.col.divider),
         ),
         child: Center(
           child: value != null
               ? Text(value!, style: const TextStyle(fontSize: 20))
-              : const Text('—',
-                  style: TextStyle(color: AppColors.textMuted)),
+              : Text('—', style: TextStyle(color: context.col.textMuted)),
         ),
       ),
     );
@@ -1355,20 +1354,20 @@ class _ColorDot extends StatelessWidget {
         height: 32,
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: color ?? AppColors.cardBg,
+          color: color ?? context.col.card,
           shape: BoxShape.circle,
           border: Border.all(
             color: selected
-                ? AppColors.textPrimary
+                ? context.col.textPrimary
                 : Colors.transparent,
             width: 2.5,
           ),
         ),
         child: color == null
-            ? const Center(
+            ? Center(
                 child: Text('—',
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.textMuted)))
+                        fontSize: 12, color: context.col.textMuted)))
             : null,
       ),
     );

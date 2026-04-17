@@ -58,10 +58,10 @@ class _PlantTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: selected ? AppColors.statusGreenBg : AppColors.cardBg,
+          color: selected ? context.col.statusGreenBg : context.col.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppColors.forest : AppColors.divider,
+            color: selected ? AppColors.forest : context.col.divider,
             width: selected ? 2 : 1,
           ),
         ),
@@ -85,7 +85,7 @@ class _PlantTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.forest : AppColors.textMuted,
+                  color: selected ? AppColors.forest : context.col.textMuted,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,

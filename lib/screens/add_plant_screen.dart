@@ -42,23 +42,23 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
       Navigator.pop(context);
       return;
     }
+    final col = context.col;
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardBg,
-        title: const Text(
+        backgroundColor: col.card,
+        title: Text(
           'Unsaved changes',
-          style: TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: col.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           'You have unsaved changes. Save before leaving?',
-          style: TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: col.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'discard'),
-            child: const Text('Discard',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: Text('Discard', style: TextStyle(color: col.textMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'save'),
@@ -141,7 +141,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         if (!didPop) _handleBackPress();
       },
       child: Scaffold(
-        backgroundColor: AppColors.cream,
+        backgroundColor: context.col.bg,
         body: SafeArea(
           top: false,
           child: Column(
@@ -157,6 +157,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _field(
+                          context: context,
                           controller: _nameController,
                           label: 'Plant name',
                           hint: 'e.g. Living Room Monstera',
@@ -165,6 +166,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                         ),
                         const SizedBox(height: 14),
                         _field(
+                          context: context,
                           controller: _speciesController,
                           label: 'Species',
                           hint: 'e.g. Monstera deliciosa',
@@ -173,6 +175,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                         ),
                         const SizedBox(height: 14),
                         _field(
+                          context: context,
                           controller: _intervalController,
                           label: 'Water every (days)',
                           hint: 'e.g. 7',
@@ -189,13 +192,14 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                         ),
                         const SizedBox(height: 14),
                         _field(
+                          context: context,
                           controller: _notesController,
                           label: 'Notes (optional)',
                           hint: 'Care tips, location, etc.',
                           maxLines: 3,
                         ),
                         const SizedBox(height: 24),
-                        _sectionLabel('Choose an illustration (optional)'),
+                        _sectionLabel(context, 'Choose an illustration (optional)'),
                         const SizedBox(height: 10),
                         PlantPicker(
                           selectedKey: _selectedPlantKey,
@@ -259,16 +263,17 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     );
   }
 
-  Widget _sectionLabel(String text) => Text(
+  Widget _sectionLabel(BuildContext context, String text) => Text(
         text,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: context.col.textPrimary,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       );
 
   Widget _field({
+    required BuildContext context,
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -280,7 +285,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel(label),
+        _sectionLabel(context, label),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -288,7 +293,7 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           maxLines: maxLines,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          style: TextStyle(color: context.col.textPrimary, fontSize: 14),
           decoration: InputDecoration(hintText: hint),
         ),
       ],

@@ -171,7 +171,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   Future<void> _showAddPhotoSheet() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.cardBg,
+      backgroundColor: context.col.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -204,7 +204,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
   Future<void> _showPhotoOptions(PlantPhoto photo, List<PlantPhoto> allPhotos) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.cardBg,
+      backgroundColor: context.col.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -261,21 +261,21 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardBg,
-        title: const Text(
+        backgroundColor: ctx.col.card,
+        title: Text(
           'Delete plant?',
-          style: TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: ctx.col.textPrimary),
         ),
         content: Text(
           'This will permanently remove ${_plant.name} and all its care history.',
-          style: const TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: ctx.col.textMuted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: ctx.col.textMuted),
             ),
           ),
           TextButton(
@@ -306,7 +306,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
     final overdue = _plant.isOverdueForWater;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: context.col.bg,
       body: SafeArea(
         top: false,
         child: Column(
@@ -357,18 +357,18 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                           child: Container(
                             height: 90,
                             decoration: BoxDecoration(
-                              color: AppColors.cardBg,
+                              color: context.col.card,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppColors.textMuted.withValues(alpha: 0.2),
+                                color: context.col.textMuted.withValues(alpha: 0.2),
                               ),
                             ),
                             child: Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.add_a_photo_outlined,
-                                      color: AppColors.textMuted, size: 28),
+                                  Icon(Icons.add_a_photo_outlined,
+                                      color: context.col.textMuted, size: 28),
                                   const SizedBox(height: 6),
                                   Text('Tap to add your first photo',
                                       style: Theme.of(context)
@@ -393,15 +393,15 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                   child: Container(
                                     width: 90,
                                     decoration: BoxDecoration(
-                                      color: AppColors.cardBg,
+                                      color: context.col.card,
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                        color: AppColors.textMuted
+                                        color: context.col.textMuted
                                             .withValues(alpha: 0.2),
                                       ),
                                     ),
-                                    child: const Icon(Icons.add,
-                                        color: AppColors.textMuted, size: 28),
+                                    child: Icon(Icons.add,
+                                        color: context.col.textMuted, size: 28),
                                   ),
                                 );
                               }
@@ -422,10 +422,10 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                                         errorBuilder: (_, _, _) => Container(
                                           width: 90,
                                           height: 110,
-                                          color: AppColors.cardBg,
-                                          child: const Icon(
+                                          color: context.col.card,
+                                          child: Icon(
                                               Icons.broken_image_outlined,
-                                              color: AppColors.textMuted),
+                                              color: context.col.textMuted),
                                         ),
                                       ),
                                     ),
@@ -455,8 +455,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                         child: Text('Care Schedule',
                             style: Theme.of(context).textTheme.titleMedium),
                       ),
-                      const Icon(Icons.notifications_outlined,
-                          size: 16, color: AppColors.textMuted),
+                      Icon(Icons.notifications_outlined,
+                          size: 16, color: context.col.textMuted),
                       const SizedBox(width: 4),
                       Switch(
                         value: _plant.notificationsEnabled,
@@ -467,8 +467,8 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                             MaterialTapTargetSize.shrinkWrap,
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.calendar_month,
-                          size: 16, color: AppColors.textMuted),
+                      Icon(Icons.calendar_month,
+                          size: 16, color: context.col.textMuted),
                       const SizedBox(width: 4),
                       Switch(
                         value: _plant.showScheduleOnCalendar,
@@ -717,7 +717,7 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: context.col.card,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -810,7 +810,7 @@ class _ActionButtons extends StatelessWidget {
               onPressed: pending ? null : onFertilize,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.olive,
-                foregroundColor: AppColors.cream,
+                foregroundColor: context.col.bg,
               ),
               child: const Text('Log Fertilizing'),
             ),
@@ -834,13 +834,13 @@ class _CareLogTile extends StatelessWidget {
     final label = isWatering ? 'Watered' : 'Fertilized';
     final color = isWatering ? AppColors.statusGreen : AppColors.olive;
     final bgColor =
-        isWatering ? AppColors.statusGreenBg : const Color(0xFFECEDD5);
+        isWatering ? context.col.statusGreenBg : const Color(0xFFECEDD5);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: context.col.card,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
