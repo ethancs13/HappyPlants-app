@@ -1,6 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:happy_plants/models/plant.dart';
+import 'package:happy_plants/models/plant_photo.dart';
+import 'package:happy_plants/repositories/plant_photo_repository.dart';
 import 'package:happy_plants/repositories/plant_repository.dart';
 import 'package:happy_plants/services/notification_service.dart';
 import 'package:happy_plants/theme/app_theme.dart';
@@ -23,6 +29,8 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
   final _intervalController = TextEditingController();
   final _notesController = TextEditingController();
   String? _selectedPlantKey;
+  XFile? _pickedPhoto;
+  final _imagePicker = ImagePicker();
   bool _saving = false;
 
   bool get _isEditing => widget.plant != null;
@@ -95,6 +103,43 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
     super.dispose();
   }
 
+  Future<void> _pickPhoto(ImageSource source) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked != null && mounted) setState(() => _pickedPhoto = picked);
+  }
+
+  Future<void> _showPhotoPicker() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: context.col.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from library'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _pickPhoto(source);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -124,6 +169,22 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
           plantKey: _selectedPlantKey,
         );
         final newId = await repo.insert(newPlant);
+        if (_pickedPhoto != null) {
+          final appDir = await getApplicationDocumentsDirectory();
+          final photosDir = Directory(p.join(appDir.path, 'plant_photos'));
+          if (!await photosDir.exists()) await photosDir.create(recursive: true);
+          final fileName =
+              '${newId}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_pickedPhoto!.path)}';
+          final destPath = p.join(photosDir.path, fileName);
+          await File(destPath).writeAsBytes(await _pickedPhoto!.readAsBytes());
+          final photoRepo = await PlantPhotoRepository.create();
+          await photoRepo.insert(PlantPhoto(
+            plantId: newId,
+            filePath: destPath,
+            dateTaken: DateTime.now(),
+            isCover: true,
+          ));
+        }
         await NotificationService.scheduleWateringReminder(
             newPlant.copyWith(id: newId));
         if (mounted) Navigator.pop(context, true);
@@ -199,6 +260,10 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
                           maxLines: 3,
                         ),
                         const SizedBox(height: 24),
+                        _sectionLabel(context, 'Cover photo (optional)'),
+                        const SizedBox(height: 10),
+                        _buildPhotoPicker(context),
+                        const SizedBox(height: 24),
                         _sectionLabel(context, 'Choose an illustration (optional)'),
                         const SizedBox(height: 10),
                         PlantPicker(
@@ -259,6 +324,55 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
             style: Theme.of(context).textTheme.headlineLarge,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoPicker(BuildContext context) {
+    return GestureDetector(
+      onTap: _showPhotoPicker,
+      child: Container(
+        height: 140,
+        decoration: BoxDecoration(
+          color: context.col.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.col.divider),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: _pickedPhoto != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(File(_pickedPhoto!.path), fit: BoxFit.cover),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _pickedPhoto = null),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close,
+                            size: 16, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo_outlined,
+                      size: 32, color: context.col.textMuted),
+                  const SizedBox(height: 8),
+                  Text('Tap to add a photo',
+                      style: TextStyle(
+                          color: context.col.textMuted, fontSize: 13)),
+                ],
+              ),
       ),
     );
   }

@@ -556,23 +556,25 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.tan),
+                icon: Icon(Icons.arrow_back, color: context.col.plantSlotFg),
                 onPressed: () => Navigator.pop(context, false),
               ),
               Expanded(
                 child: Text(
                   _plant.name,
-                  style: Theme.of(context).textTheme.headlineLarge,
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                        color: context.col.plantSlotFg,
+                      ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, color: AppColors.tan),
+                icon: Icon(Icons.edit_outlined, color: context.col.plantSlotFg),
                 onPressed: _editPlant,
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, color: AppColors.tan),
+                icon: Icon(Icons.delete_outline, color: context.col.plantSlotFg),
                 onPressed: _deletePlant,
               ),
             ],
