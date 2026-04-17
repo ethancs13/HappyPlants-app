@@ -6,8 +6,8 @@ void main() {
   testWidgets('AppColors constants are defined', (WidgetTester tester) async {
     // Verify key theme constants are accessible without platform channels.
     expect(AppColors.darkOlive, isA<Color>());
-    expect(AppColors.cream, isA<Color>());
     expect(AppColors.forest, isA<Color>());
     expect(AppColors.tan, isA<Color>());
+    expect(HappyColors.light.bg, isA<Color>());
   });
 }

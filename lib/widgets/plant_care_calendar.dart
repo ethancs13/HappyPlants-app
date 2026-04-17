@@ -12,10 +12,15 @@ import 'package:happy_plants/theme/app_theme.dart';
 
 const _waterColor = Color(0xFF4A9BE8);
 const _fertColor = Color(0xFF5B8A5F);
-const _waterBg = Color(0xFFCDE3F8);
-const _fertBg = Color(0xFFCEE3C8);
-const _scheduledBg = Color(0xFFE5F5EA);
-const _emptyBg = Color(0xFFF0EDE5);
+
+Color _waterBg(bool dark) =>
+    dark ? const Color(0xFF1A3550) : const Color(0xFFCDE3F8);
+Color _fertBg(bool dark) =>
+    dark ? const Color(0xFF1A3020) : const Color(0xFFCEE3C8);
+Color _scheduledBg(bool dark) =>
+    dark ? const Color(0xFF1E3020) : const Color(0xFFE5F5EA);
+Color _emptyBg(bool dark) =>
+    dark ? const Color(0xFF252820) : const Color(0xFFF0EDE5);
 
 const _pickerColors = [
   Color(0xFF4A9BE8), // blue
@@ -183,17 +188,17 @@ class _PlantCareCalendarState extends State<PlantCareCalendar> {
                 // Care row icon
                 SizedBox(
                   height: _rowH,
-                  child: const Center(
+                  child: Center(
                     child: Icon(Icons.eco,
-                        size: 14, color: AppColors.textMuted),
+                        size: 14, color: context.col.textMuted),
                   ),
                 ),
                 // Photo row icon
                 SizedBox(
                   height: _rowH,
-                  child: const Center(
+                  child: Center(
                     child: Icon(Icons.photo_camera,
-                        size: 14, color: AppColors.textMuted),
+                        size: 14, color: context.col.textMuted),
                   ),
                 ),
               ],
@@ -400,7 +405,7 @@ class _DayHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: isToday ? AppColors.darkOlive : AppColors.textMuted,
+              color: isToday ? AppColors.darkOlive : context.col.textMuted,
             ),
           ),
           const SizedBox(height: 2),
@@ -417,7 +422,7 @@ class _DayHeader extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isToday ? Colors.white : AppColors.textPrimary,
+                  color: isToday ? Colors.white : context.col.textPrimary,
                 ),
               ),
             ),
@@ -454,21 +459,22 @@ class _CalendarCell extends StatelessWidget {
     return Color(int.parse('FF$clean', radix: 16));
   }
 
-  Color _bgColor() {
+  Color _bgColor(bool dark) {
     if (logs.isEmpty) {
-      if (isScheduled) return _scheduledBg;
-      return _emptyBg;
+      if (isScheduled) return _scheduledBg(dark);
+      return _emptyBg(dark);
     }
     final last = logs.last;
     if (last.color != null) {
       return _parseHex(last.color!).withValues(alpha: 0.25);
     }
-    return last.type == CareType.watering ? _waterBg : _fertBg;
+    return last.type == CareType.watering ? _waterBg(dark) : _fertBg(dark);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bg = _bgColor();
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bg = _bgColor(dark);
     final hasLog = logs.isNotEmpty;
     final last = hasLog ? logs.last : null;
 
@@ -499,7 +505,7 @@ class _CalendarCell extends StatelessWidget {
             border: border,
           ),
           child: hasLog
-              ? _logContent(last!)
+              ? _logContent(last!, context)
               : isScheduled
                   ? const Center(
                       child: Icon(Icons.water_drop,
@@ -511,7 +517,7 @@ class _CalendarCell extends StatelessWidget {
     );
   }
 
-  Widget _logContent(CareLog log) {
+  Widget _logContent(CareLog log, BuildContext context) {
     Widget icon;
     if (log.emoji != null && log.emoji!.isNotEmpty) {
       icon = Text(log.emoji!, style: const TextStyle(fontSize: 18));
@@ -534,10 +540,10 @@ class _CalendarCell extends StatelessWidget {
           right: 3,
           child: Text(
             '+${logs.length - 1}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 8,
               fontWeight: FontWeight.w800,
-              color: AppColors.textMuted,
+              color: context.col.textMuted,
             ),
           ),
         ),
@@ -572,9 +578,9 @@ class _PhotoCell extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
-            color: hasPhotos
-                ? const Color(0xFFE8EFF5)
-                : const Color(0xFFF0EDE5),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? (hasPhotos ? const Color(0xFF1E2C38) : const Color(0xFF252820))
+                : (hasPhotos ? const Color(0xFFE8EFF5) : const Color(0xFFF0EDE5)),
             borderRadius: BorderRadius.circular(7),
           ),
           child: hasPhotos ? _thumbnail() : null,
@@ -593,10 +599,10 @@ class _PhotoCell extends StatelessWidget {
           child: Image.file(
             File(first.filePath),
             fit: BoxFit.cover,
-            errorBuilder: (_, e, s) => const Icon(
+            errorBuilder: (ctx, e, s) => Icon(
               Icons.broken_image,
               size: 16,
-              color: AppColors.textMuted,
+              color: ctx.col.textMuted,
             ),
           ),
         ),
@@ -768,7 +774,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _handle(),
+            _handle(context),
             Text(_label(), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
             // Existing logs with delete
@@ -816,7 +822,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                       label: 'Watering',
                       icon: Icons.water_drop,
                       color: _waterColor,
-                      bg: _waterBg,
+                      bg: _waterBg(Theme.of(context).brightness == Brightness.dark),
                       onTap: () => _log(CareType.watering),
                     ),
                   ),
@@ -826,7 +832,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                       label: 'Fertilizing',
                       icon: Icons.eco,
                       color: _fertColor,
-                      bg: _fertBg,
+                      bg: _fertBg(Theme.of(context).brightness == Brightness.dark),
                       onTap: () => _log(CareType.fertilizing),
                     ),
                   ),
@@ -840,8 +846,8 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                   icon: const Icon(Icons.calendar_month, size: 16),
                   label: const Text('Reschedule cycle'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textMuted,
-                    side: const BorderSide(color: AppColors.divider),
+                    foregroundColor: context.col.textMuted,
+                    side: BorderSide(color: context.col.divider),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                   onPressed: () async {
@@ -960,7 +966,7 @@ class _CustomLogSheetState extends State<_CustomLogSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: _handle()),
+              Center(child: _handle(context)),
               Text('Custom entry',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
@@ -1178,12 +1184,12 @@ class _RadialMenuState extends State<_RadialMenu>
 
 // ── Reusable small widgets ────────────────────────────────────────────────────
 
-Widget _handle() => Container(
+Widget _handle(BuildContext context) => Container(
       width: 36,
       height: 4,
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppColors.divider,
+        color: context.col.divider,
         borderRadius: BorderRadius.circular(2),
       ),
     );
@@ -1286,16 +1292,16 @@ class _TypeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.15) : AppColors.cardBg,
+          color: selected ? color.withValues(alpha: 0.15) : context.col.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: selected ? color : AppColors.divider,
+              color: selected ? color : context.col.divider,
               width: selected ? 2 : 1),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? color : AppColors.textMuted,
+            color: selected ? color : context.col.textMuted,
             fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
             fontSize: 13,
           ),
@@ -1322,16 +1328,15 @@ class _EmojiOption extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color:
-              selected ? AppColors.statusGreenBg : AppColors.cardBg,
+              selected ? context.col.statusGreenBg : context.col.card,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: selected ? AppColors.forest : AppColors.divider),
+              color: selected ? AppColors.forest : context.col.divider),
         ),
         child: Center(
           child: value != null
               ? Text(value!, style: const TextStyle(fontSize: 20))
-              : const Text('—',
-                  style: TextStyle(color: AppColors.textMuted)),
+              : Text('—', style: TextStyle(color: context.col.textMuted)),
         ),
       ),
     );
@@ -1355,20 +1360,20 @@ class _ColorDot extends StatelessWidget {
         height: 32,
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: color ?? AppColors.cardBg,
+          color: color ?? context.col.card,
           shape: BoxShape.circle,
           border: Border.all(
             color: selected
-                ? AppColors.textPrimary
+                ? context.col.textPrimary
                 : Colors.transparent,
             width: 2.5,
           ),
         ),
         child: color == null
-            ? const Center(
+            ? Center(
                 child: Text('—',
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.textMuted)))
+                        fontSize: 12, color: context.col.textMuted)))
             : null,
       ),
     );
