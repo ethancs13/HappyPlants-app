@@ -12,10 +12,15 @@ import 'package:happy_plants/theme/app_theme.dart';
 
 const _waterColor = Color(0xFF4A9BE8);
 const _fertColor = Color(0xFF5B8A5F);
-const _waterBg = Color(0xFFCDE3F8);
-const _fertBg = Color(0xFFCEE3C8);
-const _scheduledBg = Color(0xFFE5F5EA);
-const _emptyBg = Color(0xFFF0EDE5);
+
+Color _waterBg(bool dark) =>
+    dark ? const Color(0xFF1A3550) : const Color(0xFFCDE3F8);
+Color _fertBg(bool dark) =>
+    dark ? const Color(0xFF1A3020) : const Color(0xFFCEE3C8);
+Color _scheduledBg(bool dark) =>
+    dark ? const Color(0xFF1E3020) : const Color(0xFFE5F5EA);
+Color _emptyBg(bool dark) =>
+    dark ? const Color(0xFF252820) : const Color(0xFFF0EDE5);
 
 const _pickerColors = [
   Color(0xFF4A9BE8), // blue
@@ -454,21 +459,22 @@ class _CalendarCell extends StatelessWidget {
     return Color(int.parse('FF$clean', radix: 16));
   }
 
-  Color _bgColor() {
+  Color _bgColor(bool dark) {
     if (logs.isEmpty) {
-      if (isScheduled) return _scheduledBg;
-      return _emptyBg;
+      if (isScheduled) return _scheduledBg(dark);
+      return _emptyBg(dark);
     }
     final last = logs.last;
     if (last.color != null) {
       return _parseHex(last.color!).withValues(alpha: 0.25);
     }
-    return last.type == CareType.watering ? _waterBg : _fertBg;
+    return last.type == CareType.watering ? _waterBg(dark) : _fertBg(dark);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bg = _bgColor();
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bg = _bgColor(dark);
     final hasLog = logs.isNotEmpty;
     final last = hasLog ? logs.last : null;
 
@@ -572,9 +578,9 @@ class _PhotoCell extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
-            color: hasPhotos
-                ? const Color(0xFFE8EFF5)
-                : const Color(0xFFF0EDE5),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? (hasPhotos ? const Color(0xFF1E2C38) : const Color(0xFF252820))
+                : (hasPhotos ? const Color(0xFFE8EFF5) : const Color(0xFFF0EDE5)),
             borderRadius: BorderRadius.circular(7),
           ),
           child: hasPhotos ? _thumbnail() : null,
@@ -816,7 +822,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                       label: 'Watering',
                       icon: Icons.water_drop,
                       color: _waterColor,
-                      bg: _waterBg,
+                      bg: _waterBg(Theme.of(context).brightness == Brightness.dark),
                       onTap: () => _log(CareType.watering),
                     ),
                   ),
@@ -826,7 +832,7 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
                       label: 'Fertilizing',
                       icon: Icons.eco,
                       color: _fertColor,
-                      bg: _fertBg,
+                      bg: _fertBg(Theme.of(context).brightness == Brightness.dark),
                       onTap: () => _log(CareType.fertilizing),
                     ),
                   ),

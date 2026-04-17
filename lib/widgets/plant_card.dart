@@ -136,7 +136,7 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         overdue ? 'Overdue' : 'Good',
         style: TextStyle(
-          color: overdue ? AppColors.statusRed : AppColors.statusGreen,
+          color: overdue ? context.col.statusRedFg : context.col.statusGreenFg,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),

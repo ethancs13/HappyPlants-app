@@ -37,7 +37,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
     required this.textMuted,
     required this.statusGreenBg,
     required this.statusRedBg,
+    required this.statusGreenFg,
+    required this.statusRedFg,
     required this.plantSlotBg,
+    required this.plantSlotFg,
   });
 
   final Color bg;
@@ -47,8 +50,12 @@ class HappyColors extends ThemeExtension<HappyColors> {
   final Color textMuted;
   final Color statusGreenBg;
   final Color statusRedBg;
+  final Color statusGreenFg;
+  final Color statusRedFg;
   /// Background behind plant illustrations in cards and the detail header.
   final Color plantSlotBg;
+  /// Foreground (icons + title text) on top of plantSlotBg.
+  final Color plantSlotFg;
 
   static const light = HappyColors(
     bg: Color(0xFFF8F6F0),
@@ -58,7 +65,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
     textMuted: Color(0xFF888878),
     statusGreenBg: Color(0xFFD4EDCF),
     statusRedBg: Color(0xFFFAE5E5),
-    plantSlotBg: Color(0xFFB8C9A3), // muted sage green
+    statusGreenFg: Color(0xFF3E6B2E),
+    statusRedFg: Color(0xFFC72F2F),
+    plantSlotBg: Color(0xFFB8C9A3),
+    plantSlotFg: Color(0xFF1E2810), // dark olive — readable on sage green
   );
 
   static const dark = HappyColors(
@@ -69,7 +79,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
     textMuted: Color(0xFF9A9580),
     statusGreenBg: Color(0xFF1E3520),
     statusRedBg: Color(0xFF3A1A1A),
-    plantSlotBg: Color(0xFF2E3828), // deeper forest green for dark mode
+    statusGreenFg: Color(0xFF7EC86A),
+    statusRedFg: Color(0xFFEF7070),
+    plantSlotBg: Color(0xFF2E3828),
+    plantSlotFg: Color(0xFFCDC28E), // tan — readable on deep forest green
   );
 
   @override
@@ -81,7 +94,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
     Color? textMuted,
     Color? statusGreenBg,
     Color? statusRedBg,
+    Color? statusGreenFg,
+    Color? statusRedFg,
     Color? plantSlotBg,
+    Color? plantSlotFg,
   }) =>
       HappyColors(
         bg: bg ?? this.bg,
@@ -91,7 +107,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
         textMuted: textMuted ?? this.textMuted,
         statusGreenBg: statusGreenBg ?? this.statusGreenBg,
         statusRedBg: statusRedBg ?? this.statusRedBg,
+        statusGreenFg: statusGreenFg ?? this.statusGreenFg,
+        statusRedFg: statusRedFg ?? this.statusRedFg,
         plantSlotBg: plantSlotBg ?? this.plantSlotBg,
+        plantSlotFg: plantSlotFg ?? this.plantSlotFg,
       );
 
   @override
@@ -105,7 +124,10 @@ class HappyColors extends ThemeExtension<HappyColors> {
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       statusGreenBg: Color.lerp(statusGreenBg, other.statusGreenBg, t)!,
       statusRedBg: Color.lerp(statusRedBg, other.statusRedBg, t)!,
+      statusGreenFg: Color.lerp(statusGreenFg, other.statusGreenFg, t)!,
+      statusRedFg: Color.lerp(statusRedFg, other.statusRedFg, t)!,
       plantSlotBg: Color.lerp(plantSlotBg, other.plantSlotBg, t)!,
+      plantSlotFg: Color.lerp(plantSlotFg, other.plantSlotFg, t)!,
     );
   }
 }
