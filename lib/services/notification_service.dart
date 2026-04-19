@@ -52,16 +52,20 @@ class NotificationService {
     final next = plant.nextWateringDate;
     if (next == null || plant.id == null || !plant.notificationsEnabled) return;
 
-    // Build the target time in local time on the due date, then convert to UTC.
-    // Dart's DateTime() (without .utc) reads the device's local timezone.
-    final localTime = DateTime(next.year, next.month, next.day, notifyHour, notifyMinute);
+    // Overdue plants have nextWateringDate in the past — remind today instead.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final nextDay = DateTime(next.year, next.month, next.day);
+    final targetDay = nextDay.isAfter(today) ? nextDay : today;
+
+    final localTime = DateTime(
+        targetDay.year, targetDay.month, targetDay.day, notifyHour, notifyMinute);
     final utcTime = localTime.toUtc();
 
-    // TZDateTime.utc represents the exact moment; the device fires the
-    // notification at that instant, which equals 9 AM in the user's timezone.
     final scheduled = tz.TZDateTime.utc(
         utcTime.year, utcTime.month, utcTime.day, utcTime.hour, utcTime.minute);
 
+    // Skip if today's reminder window has already passed.
     if (scheduled.isBefore(tz.TZDateTime.now(tz.UTC))) return;
 
     await _plugin.zonedSchedule(
