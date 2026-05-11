@@ -170,20 +170,24 @@ class _AddPlantScreenState extends State<AddPlantScreen> {
         );
         final newId = await repo.insert(newPlant);
         if (_pickedPhoto != null) {
-          final appDir = await getApplicationDocumentsDirectory();
-          final photosDir = Directory(p.join(appDir.path, 'plant_photos'));
-          if (!await photosDir.exists()) await photosDir.create(recursive: true);
-          final fileName =
-              '${newId}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_pickedPhoto!.path)}';
-          final destPath = p.join(photosDir.path, fileName);
-          await File(destPath).writeAsBytes(await _pickedPhoto!.readAsBytes());
-          final photoRepo = await PlantPhotoRepository.create();
-          await photoRepo.insert(PlantPhoto(
-            plantId: newId,
-            filePath: destPath,
-            dateTaken: DateTime.now(),
-            isCover: true,
-          ));
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final photosDir = Directory(p.join(appDir.path, 'plant_photos'));
+            if (!await photosDir.exists()) await photosDir.create(recursive: true);
+            final fileName =
+                '${newId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final destPath = p.join(photosDir.path, fileName);
+            await File(destPath).writeAsBytes(await _pickedPhoto!.readAsBytes());
+            final photoRepo = await PlantPhotoRepository.create();
+            await photoRepo.insert(PlantPhoto(
+              plantId: newId,
+              filePath: destPath,
+              dateTaken: DateTime.now(),
+              isCover: true,
+            ));
+          } catch (_) {
+            // Photo save failed — plant is still created, just without a photo.
+          }
         }
         await NotificationService.scheduleWateringReminder(
             newPlant.copyWith(id: newId));
